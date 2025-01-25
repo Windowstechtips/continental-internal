@@ -166,37 +166,40 @@ export default function PresentationView() {
   const ScheduleCard = ({ schedule }: { schedule: Schedule }) => {
     const isActive = isScheduleActive(schedule);
     const isUpcoming = isScheduleUpcoming(schedule);
+    const isPast = isSchedulePast(schedule);
     const isCanceledToday = schedule.canceled_dates?.includes(format(new Date(), 'M/d'));
     const progress = isActive ? getClassProgress(schedule) : 0;
 
     return (
       <div 
         className={`relative rounded-xl p-6 ${
-          isCanceledToday 
-            ? 'bg-[#1A1111] ring-1 ring-red-500/30' 
-            : isActive
-              ? 'bg-[#111A11] ring-1 ring-green-500/30'
-              : isUpcoming
-                ? 'bg-[#11111A] ring-1 ring-blue-500/30'
-                : 'bg-[#2A2A2A]'
+          isPast ? 'opacity-50 grayscale bg-[#1A1A1A]' :
+          isCanceledToday ? 'bg-red-900/30 ring-1 ring-red-500/50' : 
+          isActive ? 'bg-emerald-900/30 ring-1 ring-emerald-500/50' :
+          isUpcoming ? 'bg-blue-900/30 ring-1 ring-blue-500/50' :
+          'bg-[#2A2A2A]'
         }`}
       >
         {/* Status indicator */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-2">
             {isCanceledToday ? (
-              <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-[#1A1111] text-red-400">
+              <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-red-900/30 text-red-400">
                 Canceled
               </span>
             ) : isActive ? (
-              <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-[#111A11] text-green-400">
+              <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-900/30 text-emerald-400">
                 In Progress
               </span>
             ) : isUpcoming ? (
-              <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-[#11111A] text-blue-400">
+              <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-900/30 text-blue-400">
                 Up Next
               </span>
-            ) : null}
+            ) : (
+              <span className="px-3 py-1.5 rounded-md text-sm font-medium bg-[#1A1A1A] text-gray-400">
+                Completed
+              </span>
+            )}
           </div>
           <div className="text-right text-lg text-gray-400">
             {format(parse(schedule.start_time, 'HH:mm', new Date()), 'h:mm a')} -{' '}
@@ -209,7 +212,7 @@ export default function PresentationView() {
           <div className="mb-4">
             <div className="h-2 bg-[#1A1A1A] rounded-full overflow-hidden">
               <div 
-                className="h-full bg-green-500/30 rounded-full transition-all duration-300 ease-in-out"
+                className="h-full bg-emerald-500/50 rounded-full transition-all duration-300 ease-in-out"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -242,41 +245,46 @@ export default function PresentationView() {
   }
 
   return (
-    <div className="relative min-h-screen bg-black overflow-hidden">
-      {/* Primary gradient layer */}
+    <div className="relative min-h-screen bg-[#121212] overflow-hidden">
+      {/* Windows-like gradient background */}
       <div 
-        className="absolute inset-0 bg-gradient-radial from-blue-600/10 via-purple-600/5 to-transparent animate-gradient-flow"
+        className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-purple-600/10 to-transparent"
         style={{
           backgroundSize: '400% 400%',
-          backgroundPosition: 'center',
+          filter: 'blur(100px)',
+          transform: 'scale(1.5)',
+          opacity: 0.4
+        }}
+      />
+      <div 
+        className="absolute inset-0 bg-gradient-to-tr from-purple-600/20 via-blue-600/10 to-transparent"
+        style={{
+          backgroundSize: '400% 400%',
           filter: 'blur(120px)',
-          transform: 'scale(2)',
+          transform: 'scale(1.2)',
           opacity: 0.3
         }}
       />
-      {/* Secondary gradient layer for additional depth */}
       <div 
-        className="absolute inset-0 bg-gradient-radial from-purple-600/10 via-blue-600/5 to-transparent animate-gradient-flow"
+        className="absolute inset-0 bg-gradient-radial from-blue-500/5 via-transparent to-transparent"
         style={{
-          backgroundSize: '400% 400%',
-          backgroundPosition: 'center',
-          filter: 'blur(100px)',
+          backgroundSize: '200% 200%',
+          filter: 'blur(80px)',
           transform: 'scale(1.5)',
-          opacity: 0.2,
-          animationDelay: '2s'
+          opacity: 0.5
         }}
       />
 
-      {/* Content container with local gradient */}
+      {/* Content container with frosted glass effect */}
       <div className="relative z-10 container mx-auto p-8">
-        <div className="mb-8 relative">
-          {/* Local gradient for content area */}
+        <div className="mb-8 relative backdrop-blur-sm">
+          {/* Time and date display with local gradient */}
           <div 
             className="absolute inset-0 bg-gradient-radial from-blue-500/10 to-transparent"
             style={{
               filter: 'blur(40px)',
               transform: 'scale(1.2)',
-              opacity: 0.15
+              opacity: 0.2
             }}
           />
           <h1 className="relative z-10 text-6xl font-extralight text-white/90 mb-2">
@@ -291,66 +299,65 @@ export default function PresentationView() {
           </p>
         </div>
 
+        {/* Rest of the content */}
         {error ? (
-          <div className="bg-red-900/20 rounded-xl p-6">
+          <div className="bg-red-900/20 backdrop-blur-md rounded-xl p-6">
             <p className="text-red-400 text-xl">{error}</p>
           </div>
         ) : schedules.length === 0 ? (
-          <div className="bg-[#1E1E1E] rounded-xl p-6">
+          <div className="bg-white/5 backdrop-blur-md rounded-xl p-6">
             <p className="text-gray-400 text-xl">No classes scheduled for today.</p>
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* Active and Upcoming Classes */}
-            <div>
-              {(() => {
-                const activeAndUpcoming = schedules.filter(schedule => !isSchedulePast(schedule));
-                const totalCards = activeAndUpcoming.length;
-                
-                return (
-                  <div className={`grid gap-4 ${
-                    totalCards <= 2 ? 'grid-cols-1 lg:grid-cols-2' :
-                    totalCards <= 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-2' :
-                    totalCards <= 6 ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3' :
-                    'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'
-                  }`}>
-                    {activeAndUpcoming
-                      .sort((a, b) => {
-                        const today = format(new Date(), 'M/d');
-                        const aIsCanceled = a.canceled_dates?.includes(today);
-                        const bIsCanceled = b.canceled_dates?.includes(today);
-                        
-                        // Push canceled classes to the end
-                        if (aIsCanceled && !bIsCanceled) return 1;
-                        if (!aIsCanceled && bIsCanceled) return -1;
-                        
-                        // If both are canceled or not canceled, sort by active status
-                        const aActive = isScheduleActive(a);
-                        const bActive = isScheduleActive(b);
-                        if (aActive && !bActive) return -1;
-                        if (!aActive && bActive) return 1;
+          <div className="space-y-12">
+            {/* Active Classes */}
+            {schedules.some(s => isScheduleActive(s)) && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-2xl font-light text-white/80">In Progress</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-sm bg-emerald-900/30 text-emerald-400 ring-1 ring-emerald-500/50">
+                    {schedules.filter(isScheduleActive).length}
+                  </span>
+                </div>
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                  {schedules
+                    .filter(isScheduleActive)
+                    .map(schedule => (
+                      <ScheduleCard key={schedule.id} schedule={schedule} />
+                    ))}
+                </div>
+              </div>
+            )}
 
-                        // Finally sort by start time
-                        const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                        const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                        return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                      })
-                      .map(schedule => (
-                        <ScheduleCard 
-                          key={schedule.id} 
-                          schedule={schedule}
-                        />
-                      ))}
-                  </div>
-                );
-              })()}
-            </div>
+            {/* Upcoming Classes */}
+            {schedules.some(s => isScheduleUpcoming(s)) && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-2xl font-light text-white/80">Up Next</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-sm bg-blue-900/30 text-blue-400 ring-1 ring-blue-500/50">
+                    {schedules.filter(isScheduleUpcoming).length}
+                  </span>
+                </div>
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                  {schedules
+                    .filter(isScheduleUpcoming)
+                    .sort((a, b) => {
+                      const [aHour, aMinute] = a.start_time.split(':').map(Number);
+                      const [bHour, bMinute] = b.start_time.split(':').map(Number);
+                      return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
+                    })
+                    .map(schedule => (
+                      <ScheduleCard key={schedule.id} schedule={schedule} />
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Past Classes */}
             {schedules.some(isSchedulePast) && (
               <div className="space-y-4">
-                <h3 className="text-xl font-light text-gray-400">Past Classes</h3>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <h3 className="text-2xl font-light text-white/60">Completed</h3>
+                <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
                   {schedules
                     .filter(isSchedulePast)
                     .sort((a, b) => {
@@ -359,10 +366,7 @@ export default function PresentationView() {
                       return (bHour * 60 + bMinute) - (aHour * 60 + aMinute);
                     })
                     .map(schedule => (
-                      <ScheduleCard 
-                        key={schedule.id} 
-                        schedule={schedule}
-                      />
+                      <ScheduleCard key={schedule.id} schedule={schedule} />
                     ))}
                 </div>
               </div>

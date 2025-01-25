@@ -12,6 +12,7 @@ export default function Navbar() {
     { name: 'Schedules', href: 'schedules' },
     { name: 'Edit Schedules', href: 'edit-schedules' },
     { name: 'Tasks', href: 'tasks' },
+    { name: 'News', href: 'news' },
   ];
 
   const isActive = (path: string) => location.pathname.endsWith(path);

@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import Schedules from './components/Schedules';
 import EditSchedules from './components/EditSchedules';
 import Tasks from './components/Tasks';
+import News from './components/News';
 import PresentationView from './components/PresentationView';
 import { DarkModeProvider } from './contexts/DarkModeContext';
 
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="schedules" element={<Schedules />} />
             <Route path="edit-schedules" element={<EditSchedules />} />
             <Route path="tasks" element={<Tasks />} />
+            <Route path="news" element={<News />} />
           </Route>
 
           {/* Redirect all other routes */}

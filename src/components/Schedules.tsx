@@ -174,6 +174,23 @@ export default function Schedules() {
     return dayMatches && teacherMatches;
   });
 
+  // Group schedules by status
+  const groupedSchedules = filteredSchedules.reduce((acc, schedule) => {
+    const isPast = isSchedulePast(schedule);
+    const isActive = isScheduleActive(schedule);
+    const isUpcoming = isScheduleUpcoming(schedule);
+
+    if (isActive) {
+      acc.active.push(schedule);
+    } else if (isUpcoming) {
+      acc.upcoming.push(schedule);
+    } else if (isPast) {
+      acc.past.push(schedule);
+    }
+
+    return acc;
+  }, { active: [] as Schedule[], upcoming: [] as Schedule[], past: [] as Schedule[] });
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -183,6 +200,7 @@ export default function Schedules() {
   }
 
   const ScheduleCard = ({ schedule }: { schedule: Schedule }) => {
+    const isPast = isSchedulePast(schedule);
     const isActive = isScheduleActive(schedule);
     const isUpcoming = isScheduleUpcoming(schedule);
     const isCanceledToday = schedule.canceled_dates?.includes(format(new Date(), 'M/d'));
@@ -191,18 +209,19 @@ export default function Schedules() {
     return (
       <div 
         className={`relative rounded-xl p-4 ${
-          isCanceledToday 
-            ? 'bg-red-900/20 ring-1 ring-red-500/50' 
-            : isActive
-              ? 'bg-green-900/20 ring-1 ring-green-500/50'
-              : isUpcoming
-                ? 'bg-blue-900/20 ring-1 ring-blue-500/50'
-                : 'bg-[#2A2A2A]'
+          isPast ? 'opacity-50 grayscale bg-[#2A2A2A]' :
+          isCanceledToday ? 'bg-red-900/20 ring-1 ring-red-500/50' : 
+          isActive ? 'bg-green-900/20 ring-1 ring-green-500/50' :
+          isUpcoming ? 'bg-blue-900/20 ring-1 ring-blue-500/50' :
+          'bg-[#2A2A2A]'
         }`}
       >
         {/* Status indicator */}
         <div className="flex justify-between items-start mb-3">
           <div className="flex items-center gap-2">
+            <span className="bg-[#1A1A1A] text-gray-300 px-2 py-1 rounded-full text-xs">
+              {schedule.day}
+            </span>
             {isCanceledToday ? (
               <span className="px-2 py-1 rounded-md text-xs font-medium bg-red-500/20 text-red-400">
                 Canceled
@@ -218,8 +237,7 @@ export default function Schedules() {
             ) : null}
           </div>
           <div className="text-right text-sm text-gray-400">
-            {format(parse(schedule.start_time, 'HH:mm', new Date()), 'h:mm a')} -{' '}
-            {format(parse(schedule.end_time, 'HH:mm', new Date()), 'h:mm a')}
+            {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
           </div>
         </div>
 
@@ -241,7 +259,7 @@ export default function Schedules() {
           <h3 className="text-lg font-medium text-white">
             {schedule.teachers?.name}
             <span className="text-sm font-normal text-gray-400 ml-2">
-              {schedule.subject}
+              {schedule.subject || schedule.teachers?.subject}
             </span>
           </h3>
           <p className="text-sm text-gray-400 mt-1">
@@ -257,34 +275,18 @@ export default function Schedules() {
       <div className="container mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
           <div>
-            <h1 className="text-4xl sm:text-6xl font-extralight text-white/90 mb-1">
-              {format(currentTime, 'EEEE')}
-            </h1>
-            <h2 className="text-6xl sm:text-8xl font-extralight tracking-tight text-white/90">
-              {format(currentTime, 'hh:mm')}{' '}
-              <span className="text-white/50">{format(currentTime, 'a')}</span>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+              Today's Schedule
             </h2>
-            <p className="text-xl sm:text-2xl font-extralight text-white/60 mt-1">
-              {format(currentTime, 'MMMM d, yyyy')}
+            <p className="text-gray-400 text-sm sm:text-base">
+              {currentDateString} - {currentTimeString}
             </p>
           </div>
-          <div className="mt-4 sm:mt-0 flex flex-col items-end gap-3">
-            <button
-              onClick={() => {
-                localStorage.removeItem('isAuthenticated');
-                window.location.href = '/login';
-              }}
-              className="px-3 py-1.5 text-sm bg-[#2A2A2A] text-gray-300 rounded-md hover:bg-[#3A3A3A] transition-colors"
-            >
-              Logout
-            </button>
-            <TeacherFilter
-              teachers={teachers}
-              selectedTeacher={selectedTeacher}
-              onSelect={setSelectedTeacher}
-              showAllOption={true}
-            />
-          </div>
+          <TeacherFilter
+            teachers={teachers}
+            selectedTeacher={selectedTeacher}
+            onSelect={setSelectedTeacher}
+          />
         </div>
 
         {error && (
@@ -293,56 +295,55 @@ export default function Schedules() {
           </div>
         )}
 
-        {/* Active and Upcoming Schedules */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {filteredSchedules
-            .filter(schedule => !isSchedulePast(schedule))
-            .sort((a, b) => {
-              const [aHour, aMinute] = a.start_time.split(':').map(Number);
-              const [bHour, bMinute] = b.start_time.split(':').map(Number);
-              const aTime = aHour * 60 + aMinute;
-              const bTime = bHour * 60 + bMinute;
-              
-              // If one is active and the other isn't, active comes first
-              const aActive = isScheduleActive(a);
-              const bActive = isScheduleActive(b);
-              if (aActive && !bActive) return -1;
-              if (!aActive && bActive) return 1;
-              
-              // Otherwise sort by start time
-              return aTime - bTime;
-            })
-            .map((schedule) => (
-              <ScheduleCard 
-                key={schedule.id} 
-                schedule={schedule} 
-              />
-            ))}
-        </div>
-
-        {/* Past Schedules */}
-        {filteredSchedules.some(isSchedulePast) && (
-          <div className="mt-8">
-            <h3 className="text-lg text-gray-400 mb-4">Past Classes</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {filteredSchedules
-                .filter(isSchedulePast)
-                .sort((a, b) => {
-                  const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                  const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                  const aTime = aHour * 60 + aMinute;
-                  const bTime = bHour * 60 + bMinute;
-                  return bTime - aTime; // Reverse sort for past schedules
-                })
-                .map((schedule) => (
-                  <ScheduleCard 
-                    key={schedule.id} 
-                    schedule={schedule} 
-                  />
-                ))}
+        <div className="space-y-6">
+          {/* Ongoing Classes */}
+          <div>
+            <h3 className="text-lg font-medium text-white mb-3">Ongoing Classes</h3>
+            <div className="grid gap-4">
+              {groupedSchedules.active.length > 0 ? (
+                groupedSchedules.active.map(schedule => (
+                  <ScheduleCard key={schedule.id} schedule={schedule} />
+                ))
+              ) : (
+                <div className="bg-[#2A2A2A] rounded-xl p-4 text-gray-400 text-center">
+                  No ongoing classes
+                </div>
+              )}
             </div>
           </div>
-        )}
+
+          {/* Upcoming Classes */}
+          <div>
+            <h3 className="text-lg font-medium text-white mb-3">Upcoming Classes</h3>
+            <div className="grid gap-4">
+              {groupedSchedules.upcoming.length > 0 ? (
+                groupedSchedules.upcoming.map(schedule => (
+                  <ScheduleCard key={schedule.id} schedule={schedule} />
+                ))
+              ) : (
+                <div className="bg-[#2A2A2A] rounded-xl p-4 text-gray-400 text-center">
+                  No upcoming classes
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Past Classes */}
+          <div>
+            <h3 className="text-lg font-medium text-white mb-3">Past Classes</h3>
+            <div className="grid gap-4">
+              {groupedSchedules.past.length > 0 ? (
+                groupedSchedules.past.map(schedule => (
+                  <ScheduleCard key={schedule.id} schedule={schedule} />
+                ))
+              ) : (
+                <div className="bg-[#2A2A2A] rounded-xl p-4 text-gray-400 text-center">
+                  No past classes
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

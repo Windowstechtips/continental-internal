@@ -1,7 +1,7 @@
-import { useState, useEffect, Fragment, useRef } from 'react';
+import React, { useState, useEffect, Fragment, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import TeacherFilter from './TeacherFilter';
-import { format, parse, isAfter, isBefore, set } from 'date-fns';
+import { format, parse, isAfter, isBefore } from 'date-fns';
 import { PlusIcon, PencilIcon, ChevronDownIcon, TrashIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
 
@@ -39,9 +39,60 @@ interface NewSchedule {
   subject: string;
 }
 
+interface TimeInputProps {
+  value: string;
+  onChange: (time: string) => void;
+  label: string;
+}
+
+interface TimeState {
+  hours: number;
+  minutes: number;
+  period: 'AM' | 'PM';
+}
+
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const GRADES = ['Grade 9', 'Grade 10'];
 const CURRICULUMS = ['Edexcel', 'Cambridge'];
+
+const TimeSelector: React.FC<TimeInputProps> = ({ value, onChange, label }) => {
+  const [localTime, setLocalTime] = useState(() => {
+    // Initialize with default time if value is empty
+    if (!value) return '';
+
+    // Parse the time value and convert to 24-hour format
+    const [hours, minutes] = value.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) return '';
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  });
+
+  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setLocalTime(newValue);
+
+    // Only update parent when we have a complete time
+    if (newValue.includes(':')) {
+      const [hours, minutes] = newValue.split(':').map(Number);
+      if (!isNaN(hours) && !isNaN(minutes)) {
+        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        onChange(formattedTime);
+      }
+    }
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
+      <input
+        type="time"
+        value={localTime}
+        onChange={handleTimeChange}
+        className="w-32 bg-[#2A2A2A] text-white rounded-md px-3 py-2"
+      />
+    </div>
+  );
+};
 
 export default function EditSchedules() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -52,16 +103,19 @@ export default function EditSchedules() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
-  const [newSchedule, setNewSchedule] = useState<NewSchedule>({
-    teacher_id: 0,
-    day: DAYS_OF_WEEK[0],
-    start_time: '',
-    end_time: '',
-    grade: GRADES[0],
-    curriculum: CURRICULUMS[0],
-    repeats: true,
-    date_tag: format(new Date(), 'M/d'),
-    subject: '',
+  const [newSchedule, setNewSchedule] = useState<NewSchedule>(() => {
+    const today = new Date();
+    return {
+      teacher_id: 0,
+      day: format(today, 'EEEE'),
+      start_time: '',
+      end_time: '',
+      grade: GRADES[0],
+      curriculum: CURRICULUMS[0],
+      repeats: true,
+      date_tag: format(today, 'M/d'),
+      subject: '',
+    };
   });
   const [showAddTeacherForm, setShowAddTeacherForm] = useState(false);
   const [newTeacher, setNewTeacher] = useState({ name: '', subject: '' });
@@ -88,7 +142,7 @@ export default function EditSchedules() {
         if (teachersError) throw teachersError;
         setTeachers(teachersData || []);
 
-        // Fetch schedules
+        // Fetch schedules without day filter
         const { data: schedulesData, error: schedulesError } = await supabase
           .from('class_schedules')
           .select(`
@@ -99,7 +153,6 @@ export default function EditSchedules() {
               subject
             )
           `)
-          .eq('day', format(currentTime, 'EEEE'))  // Filter by current day
           .order('start_time');
 
         if (schedulesError) throw schedulesError;
@@ -136,7 +189,8 @@ export default function EditSchedules() {
         grade: newSchedule.grade,
         curriculum: newSchedule.curriculum,
         repeats: newSchedule.repeats,
-        date_tag: format(new Date(), 'M/d')
+        date_tag: format(new Date(), 'M/d'),
+        subject: newSchedule.subject || selectedTeacher?.subject
       };
 
       const { data, error } = await supabase
@@ -364,170 +418,23 @@ export default function EditSchedules() {
   const currentTimeString = format(currentTime, 'h:mm a');
   const currentDateString = format(currentTime, 'MMMM d, yyyy');
 
-  const TimeSelector = ({ 
-    value, 
-    onChange, 
-    label 
-  }: { 
-    value: string, 
-    onChange: (time: string) => void,
-    label: string 
-  }) => {
-    const [selectedTime, setSelectedTime] = useState(() => {
-      if (!value) return { hour: 1, minute: 0, period: 'AM' };
-      const date = parse(value, 'HH:mm', new Date());
-      const formattedTime = format(date, 'h:mm a');
-      const [time, period] = formattedTime.split(' ');
-      const [hour, minute] = time.split(':').map(Number);
-      return { hour, minute, period };
-    });
-
-    const [tempMinute, setTempMinute] = useState('');
-    const [tempHour, setTempHour] = useState('');
-    const [isMinuteFocused, setIsMinuteFocused] = useState(false);
-    const [isHourFocused, setIsHourFocused] = useState(false);
-    
-    // Create refs for the inputs
-    const minuteInputRef = useRef<HTMLInputElement>(null);
-    const hourInputRef = useRef<HTMLInputElement>(null);
-
-    const handleTimeChange = (type: 'hour' | 'minute' | 'period', value: number | string) => {
-      let newValue = value;
-      
-      if (type === 'hour') {
-        newValue = Math.max(1, Math.min(12, Number(value)));
-      } else if (type === 'minute') {
-        newValue = Math.max(0, Math.min(59, Number(value)));
-      }
-
-      const newTime = { ...selectedTime, [type]: newValue };
-      setSelectedTime(newTime);
-      
-      let hour24 = Number(newTime.hour);
-      if (newTime.period === 'PM' && hour24 !== 12) hour24 += 12;
-      if (newTime.period === 'AM' && hour24 === 12) hour24 = 0;
-      
-      const timeString = format(
-        set(new Date(), { hours: hour24, minutes: Number(newTime.minute) }),
-        'HH:mm'
-      );
-      onChange(timeString);
-    };
-
-    const togglePeriod = () => {
-      handleTimeChange('period', selectedTime.period === 'AM' ? 'PM' : 'AM');
-    };
-
-    const handleHourChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value.replace(/\D/g, ''); // Allow only numeric input
-      setTempHour(value); // Update the tempHour state
-      if (value.length > 0) {
-        handleTimeChange('hour', Number(value)); // Update the hour if there's a valid input
-      }
-    };
-    
-    const handleHourBlur = () => {
-      const hourValue = parseInt(tempHour, 10);
-    
-      if (tempHour === '' || isNaN(hourValue) || hourValue < 1 || hourValue > 12) {
-        setTempHour(selectedTime.hour.toString()); // Reset to the current valid hour
-      } else {
-        setTempHour(hourValue.toString());
-        handleTimeChange('hour', hourValue);
-      }
-    };
-    
-
-    return (
-      <div className="relative">
-        <label className="block text-sm font-medium text-gray-300 mb-2">{label}</label>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center">
-            <input
-              ref={hourInputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={2}
-              className="w-8 bg-[#1A1A1A] text-center text-white focus:outline-none border border-gray-700 rounded-sm px-1 py-1.5"
-              value={tempHour}
-              onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, ''); // Allow only numeric input
-                setTempHour(value); // Update the tempHour state
-                if (value.length > 0) {
-                  handleTimeChange('hour', Number(value)); // Update the hour if there's a valid input
-                }
-              }}
-              onFocus={(e) => {
-                setTempHour(''); // Set to empty string on focus
-                e.target.select();
-              }}
-              onBlur={handleHourBlur}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault(); // Prevent losing focus on Enter key
-                  hourInputRef.current?.focus(); // Keep focus on the hour input
-                }
-              }}
-            />
-            <span className="text-gray-400 mx-1">:</span>
-            <input
-              ref={minuteInputRef}
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={2}
-              value={isMinuteFocused ? tempMinute : selectedTime.minute.toString().padStart(2, '0')}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (/^\d*$/.test(val)) {
-                  setTempMinute(val);
-                  if (val.length === 2) {
-                    const numVal = Number(val);
-                    if (numVal >= 0 && numVal <= 59) {
-                      handleTimeChange('minute', numVal);
-                    }
-                  }
-                }
-              }}
-              onFocus={(e) => {
-                setIsMinuteFocused(true);
-                setTempMinute('');
-                e.target.select();
-              }}
-              onBlur={() => {
-                setIsMinuteFocused(false);
-                if (tempMinute && Number(tempMinute) >= 0 && Number(tempMinute) <= 59) {
-                  handleTimeChange('minute', Number(tempMinute));
-                } else {
-                  handleTimeChange('minute', 0);
-                }
-              }}
-              className="w-10 bg-[#1E1E1E] text-white px-2 py-1.5 text-center focus:outline-none border border-gray-700 rounded-sm"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={togglePeriod}
-            className={`min-w-[48px] px-2 py-1.5 text-sm border border-gray-700 rounded-sm ${
-              selectedTime.period === 'PM' 
-                ? 'bg-blue-500 text-white border-blue-500' 
-                : 'bg-[#1E1E1E] text-gray-400'
-            }`}
-          >
-            {selectedTime.period}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   const ScheduleForm = ({ schedule, onSubmit, onCancel }: { 
     schedule: NewSchedule | Schedule, 
     onSubmit: () => void,
     onCancel: () => void 
   }) => {
-    const [formData, setFormData] = useState(schedule);
+    const [formData, setFormData] = useState(() => {
+      const today = new Date();
+      // If it's a new schedule, ensure the day is set correctly based on the current date
+      if (!('id' in schedule)) {
+        return {
+          ...schedule,
+          day: format(today, 'EEEE'),
+          date_tag: format(today, 'M/d')
+        };
+      }
+      return schedule;
+    });
     const today = new Date();
     const formattedToday = format(today, 'yyyy-MM-dd');
 
@@ -545,6 +452,35 @@ export default function EditSchedules() {
       } else {
         setNewSchedule({ ...newSchedule, [field]: value });
       }
+    };
+
+    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      // Create a new Date object from the selected date with the current time
+      const selectedDate = new Date(`${e.target.value}T00:00:00`);
+      
+      // Ensure the date is valid
+      if (isNaN(selectedDate.getTime())) {
+        console.error('Invalid date selected');
+        return;
+      }
+      
+      // Format the date tag (M/d)
+      const dateTag = format(selectedDate, 'M/d');
+      
+      // Get the day of week using date-fns format
+      const dayOfWeek = format(selectedDate, 'EEEE');
+      
+      console.log('Selected date:', selectedDate.toISOString());
+      console.log('Day of week:', dayOfWeek);
+      console.log('Date tag:', dateTag);
+      
+      // Update both the date_tag and day fields
+      handleChange('date_tag', dateTag);
+      handleChange('day', dayOfWeek);
+    };
+
+    const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      handleChange('subject', e.target.value);
     };
 
     // Group teachers by name
@@ -614,7 +550,7 @@ export default function EditSchedules() {
               <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
               <select
                 value={formData.subject || currentTeacher?.subject}
-                onChange={(e) => handleChange('subject', e.target.value)}
+                onChange={handleSubjectChange}
                 className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2"
               >
                 {teacherSubjects.map((subject) => (
@@ -630,11 +566,7 @@ export default function EditSchedules() {
           <input
             type="date"
             defaultValue={formattedToday}
-            onChange={(e) => {
-              const date = new Date(e.target.value);
-              const dateTag = format(date, 'M/d');
-              handleChange('date_tag', dateTag);
-            }}
+            onChange={handleDateChange}
             className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2"
           />
           <p className="text-sm text-gray-400 mt-1">
@@ -654,6 +586,25 @@ export default function EditSchedules() {
             onChange={(time) => handleChange('end_time', time)}
           />
         </div>
+
+        {selectedTeacher && hasMultipleSubjects && (
+          <div className="mt-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
+            <select
+              value={formData.subject || currentTeacher?.subject}
+              onChange={handleSubjectChange}
+              className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2"
+            >
+              {teacherSubjects.map((subject) => (
+                <option key={subject} value={subject}>{subject}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <p className="text-sm text-gray-400 mt-1">
+          Selected subject: {formData.subject || currentTeacher?.subject}
+        </p>
 
         <div className="flex space-x-3">
           <button
@@ -682,10 +633,10 @@ export default function EditSchedules() {
     return (
       <div
         className={`rounded-lg p-4 sm:p-6 group relative transition-all ${
-            isPast ? 'opacity-50 grayscale bg-opacity-50 hover:opacity-60 bg-[#1E1E1E]' : 
-            isCanceledToday ? 'bg-red-900/10 ring-1 ring-red-500/20' :
-            'bg-[#1E1E1E]'
-          }`}
+          isPast ? 'opacity-50 bg-[#1E1E1E] grayscale' : 
+          isCanceledToday ? 'bg-red-900/10 ring-1 ring-red-500/20' :
+          'bg-[#1E1E1E]'
+        }`}
       >
         <div className="absolute top-2 right-2 flex items-center gap-2">
           <button
@@ -731,7 +682,7 @@ export default function EditSchedules() {
               {schedule.teachers?.name}
             </h3>
             <p className="text-sm text-emerald-400 mt-1">
-              {schedule.teachers?.subject}
+              {schedule.subject || schedule.teachers?.subject}
             </p>
             <div className="flex items-center gap-2 text-gray-400 text-sm mt-2">
               <span>{schedule.grade}</span>
