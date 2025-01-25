@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import TeacherFilter from './TeacherFilter';
-import { format, parse } from 'date-fns';
+import { format } from 'date-fns';
 
 interface Teacher {
   id: number;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { format, parse } from 'date-fns';
+import { format } from 'date-fns';
 
 interface Teacher {
   id: number;
@@ -90,30 +90,6 @@ export default function PresentationView() {
     return () => clearInterval(refreshInterval);
   }, [currentTime]);
 
-  const formatTime = (time: string) => {
-    try {
-      if (!time) return '';
-      
-      const [hours, minutes] = time.split(':').map(Number);
-      
-      if (isNaN(hours) || isNaN(minutes) || 
-          hours < 0 || hours > 23 || 
-          minutes < 0 || minutes > 59) {
-        return time;
-      }
-      
-      const date = new Date();
-      date.setHours(hours);
-      date.setMinutes(minutes);
-      date.setSeconds(0);
-      date.setMilliseconds(0);
-      
-      return format(date, 'h:mm a');
-    } catch (error) {
-      return time;
-    }
-  };
-
   const isScheduleActive = (schedule: Schedule): boolean => {
     const now = new Date();
     const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
@@ -202,8 +178,18 @@ export default function PresentationView() {
             )}
           </div>
           <div className="text-right text-lg text-gray-400">
-            {format(parse(schedule.start_time, 'HH:mm', new Date()), 'h:mm a')} -{' '}
-            {format(parse(schedule.end_time, 'HH:mm', new Date()), 'h:mm a')}
+            {(() => {
+              const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
+              const startDate = new Date();
+              startDate.setHours(startHour, startMinute);
+              return format(startDate, 'h:mm a');
+            })()} -{' '}
+            {(() => {
+              const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
+              const endDate = new Date();
+              endDate.setHours(endHour, endMinute);
+              return format(endDate, 'h:mm a');
+            })()}
           </div>
         </div>
 
