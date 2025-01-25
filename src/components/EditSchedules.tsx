@@ -1,9 +1,8 @@
-import React, { useState, useEffect, Fragment, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import TeacherFilter from './TeacherFilter';
-import { format, parse, isAfter, isBefore } from 'date-fns';
-import { PlusIcon, PencilIcon, ChevronDownIcon, TrashIcon, CalendarIcon } from '@heroicons/react/24/outline';
-import { Menu, Transition } from '@headlessui/react';
+import { format } from 'date-fns';
+import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface Teacher {
   id: number;
@@ -43,12 +42,6 @@ interface TimeInputProps {
   value: string;
   onChange: (time: string) => void;
   label: string;
-}
-
-interface TimeState {
-  hours: number;
-  minutes: number;
-  period: 'AM' | 'PM';
 }
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -501,64 +494,16 @@ export default function EditSchedules() {
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">Teacher</label>
-          <Menu as="div" className="relative w-full">
-            <Menu.Button className="inline-flex w-full justify-between items-center rounded-md bg-[#2A2A2A] px-4 py-2 text-sm font-medium text-white hover:bg-[#3A3A3A] transition-colors">
-              {selectedTeacher?.name || 'Select Teacher'}
-              <ChevronDownIcon className="-mr-1 ml-2 h-5 w-5" aria-hidden="true" />
-            </Menu.Button>
-
-            <Transition
-              as={Fragment}
-              enter="transition ease-out duration-100"
-              enterFrom="transform opacity-0 scale-95"
-              enterTo="transform opacity-100 scale-100"
-              leave="transition ease-in duration-75"
-              leaveFrom="transform opacity-100 scale-100"
-              leaveTo="transform opacity-0 scale-95"
-            >
-              <Menu.Items className="absolute right-0 z-10 mt-2 w-full origin-top-right rounded-md bg-[#2A2A2A] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none max-h-[400px] overflow-y-auto">
-                <div className="py-1">
-                  {Object.values(groupedTeachers).map((teacher) => (
-                    <Menu.Item key={teacher.name}>
-                      {({ active }) => (
-                        <button
-                          onClick={() => {
-                            const firstTeacherEntry = teachers.find(t => t.name === teacher.name);
-                            setSelectedTeacher(firstTeacherEntry || null);
-                          }}
-                          className={`${
-                            active ? 'bg-[#3A3A3A]' : ''
-                          } text-white group flex w-full items-center justify-center px-4 py-2 text-sm`}
-                        >
-                          <div className="text-center">
-                            <div className="font-medium">{teacher.name}</div>
-                            <div className="text-xs text-emerald-400 mt-0.5">
-                              {teacher.subjects.join(' • ')}
-                            </div>
-                          </div>
-                        </button>
-                      )}
-                    </Menu.Item>
-                  ))}
-                </div>
-              </Menu.Items>
-            </Transition>
-          </Menu>
-
-          {selectedTeacher && hasMultipleSubjects && (
-            <div className="mt-2">
-              <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
-              <select
-                value={formData.subject || currentTeacher?.subject}
-                onChange={handleSubjectChange}
-                className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2"
-              >
-                {teacherSubjects.map((subject) => (
-                  <option key={subject} value={subject}>{subject}</option>
-                ))}
-              </select>
-            </div>
-          )}
+          <select
+            value={formData.teacher_id || selectedTeacher?.id}
+            onChange={(e) => handleChange('teacher_id', Number(e.target.value))}
+            className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2"
+          >
+            <option value={0}>Select Teacher</option>
+            {Object.values(groupedTeachers).map((teacher) => (
+              <option key={teacher.name} value={teacher.id}>{teacher.name}</option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -587,24 +532,18 @@ export default function EditSchedules() {
           />
         </div>
 
-        {selectedTeacher && hasMultipleSubjects && (
-          <div className="mt-2">
-            <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
-            <select
-              value={formData.subject || currentTeacher?.subject}
-              onChange={handleSubjectChange}
-              className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2"
-            >
-              {teacherSubjects.map((subject) => (
-                <option key={subject} value={subject}>{subject}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <p className="text-sm text-gray-400 mt-1">
-          Selected subject: {formData.subject || currentTeacher?.subject}
-        </p>
+        <div className="mt-2">
+          <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
+          <select
+            value={formData.subject || currentTeacher?.subject}
+            onChange={handleSubjectChange}
+            className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2"
+          >
+            {teacherSubjects.map((subject) => (
+              <option key={subject} value={subject}>{subject}</option>
+            ))}
+          </select>
+        </div>
 
         <div className="flex space-x-3">
           <button
