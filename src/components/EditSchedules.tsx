@@ -330,14 +330,6 @@ export default function EditSchedules() {
     return selectedTeacher ? schedule.teachers?.name === selectedTeacher.name : false;
   });
 
-  const isSchedulePast = (schedule: Schedule): boolean => {
-    const now = new Date();
-    const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
-    const endTimeInMinutes = endHour * 60 + endMinute;
-    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-    return currentTimeInMinutes > endTimeInMinutes;
-  };
-
   const isScheduleActive = (schedule: Schedule): boolean => {
     const now = new Date();
     const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
@@ -351,16 +343,6 @@ export default function EditSchedules() {
     return currentTimeInMinutes >= startTimeInMinutes && currentTimeInMinutes <= endTimeInMinutes;
   };
 
-  const isScheduleUpcoming = (schedule: Schedule): boolean => {
-    const now = new Date();
-    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-    
-    const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
-    const startTimeInMinutes = startHour * 60 + startMinute;
-    
-    return currentTimeInMinutes < startTimeInMinutes;
-  };
-
   const handleAddTeacher = async () => {
     try {
       if (!newTeacher.name || !newTeacher.subject) {
@@ -368,7 +350,7 @@ export default function EditSchedules() {
         return;
       }
 
-      const { data: teacherData, error: teacherError } = await supabase
+      await supabase
         .from('teachers')
         .insert([
           {
@@ -377,8 +359,6 @@ export default function EditSchedules() {
           }
         ])
         .select();
-
-      if (teacherError) throw teacherError;
 
       // Refresh teachers list
       const { data: teachersData, error: teachersError } = await supabase
@@ -407,7 +387,6 @@ export default function EditSchedules() {
     );
   }
 
-  const currentDay = format(currentTime, 'EEEE');
   const currentTimeString = format(currentTime, 'h:mm a');
   const currentDateString = format(currentTime, 'MMMM d, yyyy');
 
@@ -436,7 +415,6 @@ export default function EditSchedules() {
     const teacherSubjects = teachers
       .filter(t => t.name === currentTeacher?.name)
       .map(t => t.subject);
-    const hasMultipleSubjects = teacherSubjects.length > 1;
     
     const handleChange = (field: keyof (NewSchedule | Schedule), value: any) => {
       setFormData({ ...formData, [field]: value });
@@ -564,8 +542,6 @@ export default function EditSchedules() {
   };
 
   const ScheduleCard = ({ schedule, isPast }: { schedule: Schedule; isPast: boolean }) => {
-    const active = isScheduleActive(schedule);
-    const upcoming = isScheduleUpcoming(schedule);
     const today = format(new Date(), 'M/d');
     const isCanceledToday = schedule.canceled_dates?.includes(today);
     
