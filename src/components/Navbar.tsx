@@ -13,6 +13,7 @@ export default function Navbar() {
     { name: 'Edit Schedules', href: 'edit-schedules' },
     { name: 'Tasks', href: 'tasks' },
     { name: 'News', href: 'news' },
+    { name: 'Site Editor', href: 'site-editor' },
   ];
 
   const isActive = (path: string) => location.pathname.endsWith(path);

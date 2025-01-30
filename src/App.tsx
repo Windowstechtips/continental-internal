@@ -6,6 +6,7 @@ import EditSchedules from './components/EditSchedules';
 import Tasks from './components/Tasks';
 import News from './components/News';
 import PresentationView from './components/PresentationView';
+import SiteEditor from './components/SiteEditor';
 import { DarkModeProvider } from './contexts/DarkModeContext';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="edit-schedules" element={<EditSchedules />} />
             <Route path="tasks" element={<Tasks />} />
             <Route path="news" element={<News />} />
+            <Route path="site-editor" element={<SiteEditor />} />
           </Route>
 
           {/* Redirect all other routes */}
