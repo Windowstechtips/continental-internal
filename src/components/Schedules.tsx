@@ -23,6 +23,7 @@ interface Schedule {
   subject: string;
   teachers: Teacher;
   canceled_dates?: string[];
+  description: string;
 }
 
 export default function Schedules() {
@@ -170,8 +171,20 @@ export default function Schedules() {
     // Then check teacher filter if one is selected
     const teacherMatches = !selectedTeacher || schedule.teacher_id === selectedTeacher.id;
     
-    // Only show schedules that match both conditions
-    return dayMatches && teacherMatches;
+    // Check if the schedule should be shown based on repeats and date
+    const today = format(new Date(), 'M/d');
+    const hasRepeatTag = schedule.description?.includes('REPEAT');
+    const hasDateTag = schedule.description?.match(/DATE:([0-9/]+)/);
+    
+    // Show if:
+    // 1. Has REPEAT tag (show always for matching day), or
+    // 2. Has DATE tag matching today's date, or
+    // 3. Has no special tags
+    const dateMatch = hasRepeatTag || 
+      (hasDateTag ? hasDateTag[1] === today : true);
+    
+    // Only show schedules that match all conditions
+    return dayMatches && teacherMatches && dateMatch;
   });
 
   // Group schedules by status
@@ -205,6 +218,9 @@ export default function Schedules() {
     const isUpcoming = isScheduleUpcoming(schedule);
     const isCanceledToday = schedule.canceled_dates?.includes(format(new Date(), 'M/d'));
     const progress = isActive ? getClassProgress(schedule) : 0;
+
+    // Clean up description by removing special tags
+    const displayDescription = schedule.description?.replace(/\nREPEAT$/, '').replace(/\nDATE:[0-9/]+$/, '');
 
     return (
       <div 
@@ -265,6 +281,11 @@ export default function Schedules() {
           <p className="text-sm text-gray-400 mt-1">
             {schedule.grade} • {schedule.curriculum}
           </p>
+          {displayDescription && (
+            <p className="text-sm text-gray-300 mt-2 whitespace-pre-wrap">
+              {displayDescription}
+            </p>
+          )}
         </div>
       </div>
     );

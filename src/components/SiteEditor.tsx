@@ -21,6 +21,7 @@ interface Teacher {
   subject_name: string;
   qualifications: string[];
   description: string;
+  picture_id: string;
 }
 
 const Tab: React.FC<TabProps> = ({ label, isActive, onClick }) => (
@@ -65,6 +66,7 @@ const TeacherCard = ({ teacher, onEdit, onDelete }: { teacher: Teacher; onEdit: 
       <div>
         <h3 className="text-lg font-semibold">{teacher.teacher_name}</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">{teacher.subject_name}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Picture ID: {teacher.picture_id}</p>
       </div>
       <div className="flex space-x-2">
         <button
@@ -192,7 +194,8 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
     teacher_name: editingTeacher?.teacher_name || '',
     subject_name: editingTeacher?.subject_name || '',
     qualifications: editingTeacher?.qualifications.join('\n') || '',
-    description: editingTeacher?.description || ''
+    description: editingTeacher?.description || '',
+    picture_id: editingTeacher?.picture_id || ''
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -207,7 +210,6 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
       onClose();
     } catch (error) {
       console.error('Error saving teacher:', error);
-      // You might want to show an error message to the user here
     } finally {
       setIsLoading(false);
     }
@@ -248,6 +250,17 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
             />
           </div>
           <div>
+            <label className="block text-sm font-medium mb-2">Picture ID</label>
+            <input
+              type="text"
+              name="picture_id"
+              value={formData.picture_id}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              placeholder="Enter picture ID"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium mb-2">Qualifications</label>
             <textarea
               name="qualifications"
@@ -268,7 +281,7 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
             />
           </div>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex space-x-3 mt-6">
           <button 
             type="submit"
             disabled={isLoading}

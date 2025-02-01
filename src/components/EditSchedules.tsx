@@ -24,6 +24,7 @@ interface Schedule {
   subject: string;
   teachers: Teacher | null;
   canceled_dates?: string[];
+  description: string;
 }
 
 interface NewSchedule {
@@ -36,6 +37,7 @@ interface NewSchedule {
   repeats: boolean;
   date_tag: string;
   subject: string;
+  description: string;
 }
 
 interface TimeInputProps {
@@ -108,6 +110,7 @@ export default function EditSchedules() {
       repeats: true,
       date_tag: format(today, 'M/d'),
       subject: '',
+      description: '',
     };
   });
   const [showAddTeacherForm, setShowAddTeacherForm] = useState(false);
@@ -167,28 +170,16 @@ export default function EditSchedules() {
 
   const handleAddSchedule = async () => {
     try {
-      // Validate required fields
       if (!newSchedule.start_time || !newSchedule.end_time) {
         setError('Please select both start and end times');
         return;
       }
 
-      // Create the schedule object with only valid database fields
-      const scheduleData = {
-        teacher_id: selectedTeacher?.id,
-        day: newSchedule.day,
-        start_time: newSchedule.start_time,
-        end_time: newSchedule.end_time,
-        grade: newSchedule.grade,
-        curriculum: newSchedule.curriculum,
-        repeats: newSchedule.repeats,
-        date_tag: format(new Date(), 'M/d'),
-        subject: newSchedule.subject || selectedTeacher?.subject
-      };
+      console.log('Adding new schedule:', newSchedule);
 
       const { data, error } = await supabase
         .from('class_schedules')
-        .insert([scheduleData])
+        .insert([newSchedule])
         .select(`
           *,
           teachers (
@@ -201,7 +192,9 @@ export default function EditSchedules() {
 
       if (error) throw error;
 
-      setSchedules([...schedules, data]);
+      console.log('Add response:', data);
+
+      setSchedules(prevSchedules => [...prevSchedules, data]);
       setShowAddForm(false);
       setNewSchedule({
         teacher_id: 0,
@@ -212,49 +205,12 @@ export default function EditSchedules() {
         curriculum: CURRICULUMS[0],
         repeats: true,
         date_tag: format(new Date(), 'M/d'),
-        subject: ''
+        subject: '',
+        description: ''
       });
-      setError(null);
     } catch (err: any) {
       console.error('Error adding schedule:', err);
       setError(err.message || 'Failed to add schedule. Please try again.');
-    }
-  };
-
-  const handleEditSchedule = async () => {
-    if (!editingSchedule) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('class_schedules')
-        .update({
-          day: editingSchedule.day,
-          start_time: editingSchedule.start_time,
-          end_time: editingSchedule.end_time,
-          grade: editingSchedule.grade,
-          curriculum: editingSchedule.curriculum,
-          repeats: editingSchedule.repeats,
-          date_tag: editingSchedule.date_tag,
-          subject: editingSchedule.subject,
-        })
-        .eq('id', editingSchedule.id)
-        .select(`
-          *,
-          teachers (
-            id,
-            name,
-            subject
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      setSchedules(schedules.map(s => s.id === data.id ? data : s));
-      setEditingSchedule(null);
-    } catch (err) {
-      console.error('Error updating schedule:', err);
-      setError('Failed to update schedule. Please try again.');
     }
   };
 
@@ -397,16 +353,29 @@ export default function EditSchedules() {
   }) => {
     const [formData, setFormData] = useState(() => {
       const today = new Date();
-      // If it's a new schedule, ensure the day is set correctly based on the current date
+      // Check if there's a DATE tag in the description to determine repeat state
+      const hasDateTag = schedule.description?.includes('DATE:');
+      
       if (!('id' in schedule)) {
         return {
           ...schedule,
           day: format(today, 'EEEE'),
-          date_tag: format(today, 'M/d')
+          date_tag: format(today, 'M/d'),
+          description: schedule.description || '',
+          repeats: !hasDateTag // if there's a date tag, it's not repeating
         };
       }
-      return schedule;
+      return {
+        ...schedule,
+        description: schedule.description || '',
+        repeats: !hasDateTag // if there's a date tag, it's not repeating
+      };
     });
+
+    const handleChange = (field: keyof (NewSchedule | Schedule), value: any) => {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
     const today = new Date();
     const formattedToday = format(today, 'yyyy-MM-dd');
 
@@ -416,15 +385,6 @@ export default function EditSchedules() {
       .filter(t => t.name === currentTeacher?.name)
       .map(t => t.subject);
     
-    const handleChange = (field: keyof (NewSchedule | Schedule), value: any) => {
-      setFormData({ ...formData, [field]: value });
-      if ('id' in schedule) {
-        setEditingSchedule({ ...editingSchedule!, [field]: value });
-      } else {
-        setNewSchedule({ ...newSchedule, [field]: value });
-      }
-    };
-
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       // Create a new Date object from the selected date with the current time
       const selectedDate = new Date(`${e.target.value}T00:00:00`);
@@ -467,6 +427,85 @@ export default function EditSchedules() {
       }
       return acc;
     }, {} as Record<string, { id: number; name: string; subjects: string[] }>);
+
+    const handleSubmit = async () => {
+      const today = format(new Date(), 'M/d');
+      
+      // Clean the description first
+      let cleanDescription = (formData.description || '')
+        .replace(/\nREPEAT/g, '')  // Remove any REPEAT tags
+        .replace(/\nDATE:[0-9/]+/g, '')  // Remove any DATE tags
+        .trim();
+
+      // Add appropriate tag
+      const finalDescription = !formData.repeats 
+        ? cleanDescription + (cleanDescription ? `\nDATE:${today}` : `DATE:${today}`)
+        : cleanDescription + (cleanDescription ? '\nREPEAT' : 'REPEAT');
+
+      if ('id' in schedule) {
+        // For editing, include all necessary fields
+        const updateData = {
+          teacher_id: formData.teacher_id || selectedTeacher?.id || null,
+          day: formData.day,
+          start_time: formData.start_time,
+          end_time: formData.end_time,
+          grade: formData.grade || schedule.grade,
+          curriculum: formData.curriculum || schedule.curriculum,
+          date_tag: formData.date_tag,
+          repeats: formData.repeats,
+          subject: formData.subject || selectedTeacher?.subject || schedule.subject,
+          description: finalDescription
+        };
+
+        console.log('Updating schedule with:', updateData);
+
+        try {
+          const { data, error } = await supabase
+            .from('class_schedules')
+            .update(updateData)
+            .eq('id', schedule.id)
+            .select(`
+              *,
+              teachers (
+                id,
+                name,
+                subject
+              )
+            `)
+            .single();
+
+          if (error) throw error;
+
+          console.log('Update response:', data);
+          
+          // Update local state
+          setSchedules(prevSchedules => 
+            prevSchedules.map(s => s.id === data.id ? data : s)
+          );
+          setEditingSchedule(null);
+          setShowAddForm(false);
+          onSubmit();
+        } catch (err) {
+          console.error('Error updating schedule:', err);
+          setError('Failed to update schedule. Please try again.');
+        }
+      } else {
+        const newScheduleData: NewSchedule = {
+          teacher_id: formData.teacher_id || selectedTeacher?.id || null,
+          day: formData.day,
+          start_time: formData.start_time,
+          end_time: formData.end_time,
+          grade: formData.grade,
+          curriculum: formData.curriculum,
+          repeats: formData.repeats,
+          date_tag: formData.date_tag,
+          subject: formData.subject || selectedTeacher?.subject || '',
+          description: finalDescription
+        };
+        setNewSchedule(newScheduleData);
+        onSubmit();
+      }
+    };
 
     return (
       <div className="space-y-4">
@@ -523,9 +562,54 @@ export default function EditSchedules() {
           </select>
         </div>
 
+        <div className="mt-2">
+          <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => handleChange('description', e.target.value)}
+            className="w-full bg-[#2A2A2A] text-white rounded-md px-3 py-2 min-h-[100px]"
+            placeholder="Enter class description"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-300">Repeat</label>
+          <button
+            type="button"
+            onClick={() => {
+              const newRepeats = !formData.repeats;
+              const today = format(new Date(), 'M/d');
+              
+              // Clean the description first
+              let cleanDescription = (formData.description || '')
+                .replace(/\nREPEAT/g, '')  // Remove any REPEAT tags
+                .replace(/\nDATE:[0-9/]+/g, '')  // Remove any DATE tags
+                .trim();
+
+              // Add appropriate tag
+              const newDescription = newRepeats 
+                ? cleanDescription + (cleanDescription ? '\nREPEAT' : 'REPEAT')
+                : cleanDescription + (cleanDescription ? `\nDATE:${today}` : `DATE:${today}`);
+
+              setFormData(prev => ({
+                ...prev,
+                repeats: newRepeats,
+                description: newDescription
+              }));
+            }}
+            className={`px-4 py-2 rounded-md text-sm transition-colors ${
+              formData.repeats 
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'bg-[#2A2A2A] text-gray-300 hover:bg-[#3A3A3A]'
+            }`}
+          >
+            {formData.repeats ? 'Repeating' : 'One-time'}
+          </button>
+        </div>
+
         <div className="flex space-x-3">
           <button
-            onClick={onSubmit}
+            onClick={handleSubmit}
             className="flex-1 bg-blue-600 text-white rounded-md py-2 hover:bg-blue-700 transition-colors"
           >
             {'id' in schedule ? 'Update Schedule' : 'Add Schedule'}
@@ -675,7 +759,7 @@ export default function EditSchedules() {
               </h3>
               <ScheduleForm
                 schedule={editingSchedule || newSchedule}
-                onSubmit={editingSchedule ? handleEditSchedule : handleAddSchedule}
+                onSubmit={editingSchedule ? () => {} : handleAddSchedule}
                 onCancel={() => {
                   setShowAddForm(false);
                   setEditingSchedule(null);

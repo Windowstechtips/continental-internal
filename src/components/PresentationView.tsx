@@ -22,6 +22,7 @@ interface Schedule {
   subject: string;
   teachers: Teacher;
   canceled_dates?: string[];
+  description: string;
 }
 
 export default function PresentationView() {
@@ -74,7 +75,22 @@ export default function PresentationView() {
           .order('start_time');
 
         if (schedulesError) throw schedulesError;
-        setSchedules(schedulesData);
+        
+        // Filter schedules based on repeats and date
+        const today = format(currentTime, 'M/d');
+        const filteredData = schedulesData?.filter(schedule => {
+          const hasRepeatTag = schedule.description?.includes('REPEAT');
+          const hasDateTag = schedule.description?.match(/DATE:([0-9/]+)/);
+          
+          // Show if:
+          // 1. Has REPEAT tag (show always for matching day), or
+          // 2. Has DATE tag matching today's date, or
+          // 3. Has no special tags
+          return hasRepeatTag || 
+            (hasDateTag ? hasDateTag[1] === today : true);
+        });
+        
+        setSchedules(filteredData || []);
         setError(null);
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -145,6 +161,9 @@ export default function PresentationView() {
     const isPast = isSchedulePast(schedule);
     const isCanceledToday = schedule.canceled_dates?.includes(format(new Date(), 'M/d'));
     const progress = isActive ? getClassProgress(schedule) : 0;
+
+    // Clean up description by removing special tags
+    const displayDescription = schedule.description?.replace(/\nREPEAT$/, '').replace(/\nDATE:[0-9/]+$/, '');
 
     return (
       <div 
@@ -217,6 +236,11 @@ export default function PresentationView() {
           <p className="text-lg text-gray-400 mt-2">
             {schedule.grade} • {schedule.curriculum}
           </p>
+          {displayDescription && (
+            <p className="text-lg text-gray-300 mt-4 whitespace-pre-wrap">
+              {displayDescription}
+            </p>
+          )}
         </div>
       </div>
     );
