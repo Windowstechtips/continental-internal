@@ -7,44 +7,43 @@ import Tasks from './components/Tasks';
 import News from './components/News';
 import PresentationView from './components/PresentationView';
 import SiteEditor from './components/SiteEditor';
-import { DarkModeProvider } from './contexts/DarkModeContext';
+import Store from './components/Store/Store';
 
 export default function App() {
   // Check if user is authenticated
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
 
   return (
-    <DarkModeProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public route */}
-          <Route 
-            path="/login" 
-            element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} 
-          />
+    <BrowserRouter>
+      <Routes>
+        {/* Public route */}
+        <Route 
+          path="/login" 
+          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} 
+        />
 
-          {/* Protected routes */}
-          <Route 
-            path="/presentation" 
-            element={isAuthenticated ? <PresentationView /> : <Navigate to="/login" />} 
-          />
+        {/* Protected routes */}
+        <Route 
+          path="/presentation" 
+          element={isAuthenticated ? <PresentationView /> : <Navigate to="/login" />} 
+        />
 
-          <Route
-            path="/dashboard"
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
-          >
-            <Route index element={<Schedules />} />
-            <Route path="schedules" element={<Schedules />} />
-            <Route path="edit-schedules" element={<EditSchedules />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="news" element={<News />} />
-            <Route path="site-editor" element={<SiteEditor />} />
-          </Route>
+        <Route
+          path="/dashboard"
+          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
+        >
+          <Route index element={<Schedules />} />
+          <Route path="schedules" element={<Schedules />} />
+          <Route path="edit-schedules" element={<EditSchedules />} />
+          <Route path="tasks" element={<Tasks />} />
+          <Route path="news" element={<News />} />
+          <Route path="site-editor" element={<SiteEditor />} />
+          <Route path="store/*" element={<Store />} />
+        </Route>
 
-          {/* Redirect all other routes */}
-          <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
-        </Routes>
-      </BrowserRouter>
-    </DarkModeProvider>
+        {/* Redirect all other routes */}
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

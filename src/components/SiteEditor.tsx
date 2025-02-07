@@ -22,6 +22,8 @@ interface Teacher {
   qualifications: string[];
   description: string;
   picture_id: string;
+  grade: string;  // Changed from grades to grade
+  syllabus: string;
 }
 
 const Tab: React.FC<TabProps> = ({ label, isActive, onClick }) => (
@@ -38,56 +40,66 @@ const Tab: React.FC<TabProps> = ({ label, isActive, onClick }) => (
 );
 
 const SubjectCard = ({ subject, onEdit, onDelete }: { subject: Subject; onEdit: () => void; onDelete: () => void }) => (
-  <div className="bg-white dark:bg-gray-700 rounded-lg shadow p-4 hover:shadow-lg transition-shadow">
+  <div className="bg-[#1e2837] rounded-lg shadow p-4 hover:shadow-lg transition-shadow">
     <div className="flex justify-between items-start mb-3">
-      <h3 className="text-lg font-semibold">{subject.subject_name}</h3>
+      <h3 className="text-lg font-semibold text-gray-200">{subject.subject_name}</h3>
       <div className="flex space-x-2">
         <button
           onClick={onEdit}
-          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+          className="p-1 rounded-full hover:bg-gray-700/50 transition-colors"
         >
-          <PencilIcon className="h-5 w-5 text-blue-500" />
+          <PencilIcon className="h-5 w-5 text-blue-400" />
         </button>
         <button 
           onClick={onDelete}
-          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+          className="p-1 rounded-full hover:bg-gray-700/50 transition-colors"
         >
-          <TrashIcon className="h-5 w-5 text-red-500" />
+          <TrashIcon className="h-5 w-5 text-red-400" />
         </button>
       </div>
     </div>
-    <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">{subject.subject_description}</p>
+    <p className="text-gray-400 text-sm line-clamp-2">{subject.subject_description}</p>
   </div>
 );
 
 const TeacherCard = ({ teacher, onEdit, onDelete }: { teacher: Teacher; onEdit: () => void; onDelete: () => void }) => (
-  <div className="bg-white dark:bg-gray-700 rounded-lg shadow p-4 hover:shadow-lg transition-shadow">
+  <div className="bg-[#1e2837] rounded-lg shadow p-4 hover:shadow-lg transition-shadow">
     <div className="flex justify-between items-start mb-3">
       <div>
-        <h3 className="text-lg font-semibold">{teacher.teacher_name}</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{teacher.subject_name}</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">Picture ID: {teacher.picture_id}</p>
+        <h3 className="text-lg font-semibold text-gray-200">{teacher.teacher_name}</h3>
+        <p className="text-sm text-blue-400">{teacher.subject_name}</p>
+        <p className="text-xs text-gray-500">Picture ID: {teacher.picture_id}</p>
       </div>
       <div className="flex space-x-2">
         <button
           onClick={onEdit}
-          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+          className="p-1 rounded-full hover:bg-gray-700/50 transition-colors"
         >
-          <PencilIcon className="h-5 w-5 text-blue-500" />
+          <PencilIcon className="h-5 w-5 text-blue-400" />
         </button>
         <button 
           onClick={onDelete}
-          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+          className="p-1 rounded-full hover:bg-gray-700/50 transition-colors"
         >
-          <TrashIcon className="h-5 w-5 text-red-500" />
+          <TrashIcon className="h-5 w-5 text-red-400" />
         </button>
       </div>
     </div>
     <div className="space-y-2">
-      <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2">{teacher.description}</p>
-      <div className="text-sm text-gray-500 dark:text-gray-400">
+      <p className="text-gray-400 text-sm line-clamp-2">{teacher.description}</p>
+      <div className="text-sm text-gray-500">
         {teacher.qualifications.length} qualification(s)
       </div>
+      {teacher.grade && (
+        <div className="text-sm text-gray-500">
+          Grade: {teacher.grade}
+        </div>
+      )}
+      {teacher.syllabus && (
+        <div className="text-sm text-gray-500">
+          Syllabus: {teacher.syllabus}
+        </div>
+      )}
     </div>
   </div>
 );
@@ -193,23 +205,46 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
   const [formData, setFormData] = useState({
     teacher_name: editingTeacher?.teacher_name || '',
     subject_name: editingTeacher?.subject_name || '',
-    qualifications: editingTeacher?.qualifications.join('\n') || '',
+    qualifications: editingTeacher?.qualifications?.join('\n') || '',
     description: editingTeacher?.description || '',
-    picture_id: editingTeacher?.picture_id || ''
+    picture_id: editingTeacher?.picture_id || '',
+    grade: editingTeacher?.grade || '',  // Changed from grades to grade
+    syllabus: editingTeacher?.syllabus || ''
   });
+
+  const [selectedGrades, setSelectedGrades] = useState<string[]>(
+    editingTeacher?.grade ? editingTeacher.grade.split(',') : []  // Changed from grades to grade
+  );
+  const [selectedSyllabus, setSelectedSyllabus] = useState<string[]>(
+    editingTeacher?.syllabus ? editingTeacher.syllabus.split(',') : []
+  );
+
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
     try {
+      // Validate required fields
+      if (!formData.teacher_name.trim()) {
+        throw new Error('Teacher name is required');
+      }
+      if (!formData.subject_name.trim()) {
+        throw new Error('Subject name is required');
+      }
+
       await onSave({
         ...formData,
-        qualifications: formData.qualifications.split('\n').filter(q => q.trim())
+        qualifications: formData.qualifications.split('\n').filter(q => q.trim()),
+        grade: selectedGrades.join(','),  // Changed from grades to grade
+        syllabus: selectedSyllabus.join(',')
       });
       onClose();
-    } catch (error) {
-      console.error('Error saving teacher:', error);
+    } catch (err) {
+      console.error('Error saving teacher:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save teacher');
     } finally {
       setIsLoading(false);
     }
@@ -220,67 +255,143 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const toggleGrade = (grade: string) => {
+    setSelectedGrades(prev => 
+      prev.includes(grade)
+        ? prev.filter(g => g !== grade)
+        : [...prev, grade]
+    );
+  };
+
+  const toggleSyllabus = (syl: string) => {
+    setSelectedSyllabus(prev => 
+      prev.includes(syl)
+        ? prev.filter(s => s !== syl)
+        : [...prev, syl]
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl">
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className="text-xl font-semibold mb-4 text-gray-200">
           {editingTeacher ? 'Edit Teacher Content' : 'Add Teacher Content'}
         </h2>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
+          </div>
+        )}
+
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Teacher Name</label>
+            <label className="block text-sm font-medium mb-2 text-gray-200">Teacher Name</label>
             <input
               type="text"
               name="teacher_name"
               value={formData.teacher_name}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-gray-200"
               placeholder="Enter teacher name"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium mb-2">Subject Name</label>
+            <label className="block text-sm font-medium mb-2 text-gray-200">Subject Name</label>
             <input
               type="text"
               name="subject_name"
               value={formData.subject_name}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-gray-200"
               placeholder="Enter subject name"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium mb-2">Picture ID</label>
+            <label className="block text-sm font-medium mb-2 text-gray-200">Grade</label>
+            <div className="flex gap-4">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={selectedGrades.includes('9')}
+                  onChange={() => toggleGrade('9')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-gray-200">Grade 9</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={selectedGrades.includes('10')}
+                  onChange={() => toggleGrade('10')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-gray-200">Grade 10</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-200">Syllabus</label>
+            <div className="flex gap-4">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={selectedSyllabus.includes('Cambridge')}
+                  onChange={() => toggleSyllabus('Cambridge')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-gray-200">Cambridge</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={selectedSyllabus.includes('Edexcel')}
+                  onChange={() => toggleSyllabus('Edexcel')}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-gray-200">Edexcel</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-200">Picture ID</label>
             <input
               type="text"
               name="picture_id"
               value={formData.picture_id}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-gray-200"
               placeholder="Enter picture ID"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium mb-2">Qualifications</label>
+            <label className="block text-sm font-medium mb-2 text-gray-200">Qualifications</label>
             <textarea
               name="qualifications"
               value={formData.qualifications}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-h-[100px]"
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-h-[100px] text-gray-200"
               placeholder="Enter qualifications (one per line)"
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium mb-2">Description</label>
+            <label className="block text-sm font-medium mb-2 text-gray-200">Description</label>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-h-[150px]"
+              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-h-[150px] text-gray-200"
               placeholder="Enter teacher description"
             />
           </div>
         </div>
+
         <div className="flex space-x-3 mt-6">
           <button 
             type="submit"
@@ -293,7 +404,7 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors disabled:opacity-50"
+            className="bg-gray-600 text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-500 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
@@ -355,19 +466,40 @@ export default function SiteEditor() {
   };
 
   const handleSaveTeacher = async (data: Omit<Teacher, 'id'>) => {
-    if (editingItem) {
-      const { error } = await supabase
-        .from('teachers_content')
-        .update(data)
-        .eq('id', (editingItem as Teacher).id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('teachers_content')
-        .insert([data]);
-      if (error) throw error;
+    const formattedData = {
+      teacher_name: data.teacher_name,
+      subject_name: data.subject_name,
+      qualifications: data.qualifications,
+      description: data.description,
+      picture_id: data.picture_id || '',
+      grade: data.grade || '',  // Changed from grades to grade
+      syllabus: data.syllabus || ''
+    };
+
+    try {
+      if (editingItem) {
+        const { error } = await supabase
+          .from('teachers_content')
+          .update(formattedData)
+          .eq('id', (editingItem as Teacher).id);
+        if (error) {
+          console.error('Update error details:', error);
+          throw error;
+        }
+      } else {
+        const { error } = await supabase
+          .from('teachers_content')
+          .insert([formattedData]);
+        if (error) {
+          console.error('Insert error details:', error);
+          throw error;
+        }
+      }
+      fetchData();
+    } catch (error) {
+      console.error('Error saving teacher:', error);
+      throw error;
     }
-    fetchData();
   };
 
   const handleDelete = async (id: string) => {
@@ -411,7 +543,7 @@ export default function SiteEditor() {
         </div>
         
         {isLoading ? (
-          <div className="text-center py-8">Loading...</div>
+          <div className="text-center py-8 text-gray-200">Loading...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {activeTab === 'subjects'

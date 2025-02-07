@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { SunIcon, MoonIcon, Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
-import { useDarkMode } from '../contexts/DarkModeContext';
+import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   const navigation = [
     { name: 'Schedules', href: 'schedules' },
@@ -14,6 +12,7 @@ export default function Navbar() {
     { name: 'Tasks', href: 'tasks' },
     { name: 'News', href: 'news' },
     { name: 'Site Editor', href: 'site-editor' },
+    { name: 'Store', href: 'store' },
   ];
 
   const isActive = (path: string) => location.pathname.endsWith(path);
@@ -50,18 +49,7 @@ export default function Navbar() {
                 </Link>
               ))}
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-md text-gray-300 hover:bg-[#2A2A2A] transition-colors"
-                aria-label="Toggle dark mode"
-              >
-                {isDarkMode ? (
-                  <SunIcon className="h-5 w-5" />
-                ) : (
-                  <MoonIcon className="h-5 w-5" />
-                )}
-              </button>
+            <div className="flex items-center">
               <button
                 onClick={handleLogout}
                 className="p-2 rounded-md text-red-400 hover:bg-[#2A2A2A] transition-colors"
@@ -74,17 +62,6 @@ export default function Navbar() {
 
           {/* Mobile Navigation Button */}
           <div className="flex md:hidden items-center space-x-2">
-            <button
-              onClick={toggleDarkMode}
-              className="p-2 rounded-md text-gray-300 hover:bg-[#2A2A2A]"
-              aria-label="Toggle dark mode"
-            >
-              {isDarkMode ? (
-                <SunIcon className="h-5 w-5" />
-              ) : (
-                <MoonIcon className="h-5 w-5" />
-              )}
-            </button>
             <button
               onClick={handleLogout}
               className="p-2 rounded-md text-red-400 hover:bg-[#2A2A2A]"
