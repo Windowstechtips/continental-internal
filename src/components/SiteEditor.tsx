@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { supabase } from '../lib/supabase';
+import { format } from 'date-fns';
 
 interface TabProps {
   label: string;
@@ -24,6 +25,14 @@ interface Teacher {
   picture_id: string;
   grade: string;  // Changed from grades to grade
   syllabus: string;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string;
+  event_date: string;
+  created_at: string;
 }
 
 const Tab: React.FC<TabProps> = ({ label, isActive, onClick }) => (
@@ -104,6 +113,32 @@ const TeacherCard = ({ teacher, onEdit, onDelete }: { teacher: Teacher; onEdit: 
   </div>
 );
 
+const CalendarEventCard = ({ event, onEdit, onDelete }: { event: CalendarEvent; onEdit: () => void; onDelete: () => void }) => (
+  <div className="bg-[#1e2837] rounded-lg shadow p-4 hover:shadow-lg transition-shadow">
+    <div className="flex justify-between items-start mb-3">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-200">{event.title}</h3>
+        <p className="text-sm text-blue-400">{format(new Date(event.event_date), 'MMMM d, yyyy')}</p>
+      </div>
+      <div className="flex space-x-2">
+        <button
+          onClick={onEdit}
+          className="p-1 rounded-full hover:bg-gray-700/50 transition-colors"
+        >
+          <PencilIcon className="h-5 w-5 text-blue-400" />
+        </button>
+        <button 
+          onClick={onDelete}
+          className="p-1 rounded-full hover:bg-gray-700/50 transition-colors"
+        >
+          <TrashIcon className="h-5 w-5 text-red-400" />
+        </button>
+      </div>
+    </div>
+    <p className="text-gray-400 text-sm line-clamp-2">{event.description}</p>
+  </div>
+);
+
 const SubjectsEditor = ({ onClose, editingSubject, onSave }: { 
   onClose: () => void; 
   editingSubject?: Subject;
@@ -136,46 +171,46 @@ const SubjectsEditor = ({ onClose, editingSubject, onSave }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl">
-        <h2 className="text-xl font-semibold mb-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto">
+      <form onSubmit={handleSubmit} className="bg-[#1A1A1A] rounded-lg shadow-xl p-6 w-full max-w-2xl my-8">
+        <h2 className="text-xl font-semibold mb-4 text-gray-200">
           {editingSubject ? 'Edit Subject Content' : 'Add Subject Content'}
         </h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Subject Name</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Subject Name</label>
             <input
               type="text"
               name="subject_name"
               value={formData.subject_name}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Enter subject name"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Subject Description</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Subject Description</label>
             <textarea
               name="subject_description"
               value={formData.subject_description}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-h-[150px]"
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[150px]"
               placeholder="Enter subject description"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">WhatsApp Group Link</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">WhatsApp Group Link</label>
             <input
               type="text"
               name="whatsapp_link"
               value={formData.whatsapp_link}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Enter WhatsApp group link"
             />
           </div>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex space-x-3 mt-6">
           <button 
             type="submit"
             disabled={isLoading}
@@ -187,7 +222,7 @@ const SubjectsEditor = ({ onClose, editingSubject, onSave }: {
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors disabled:opacity-50"
+            className="bg-[#2A2A2A] text-gray-300 px-4 py-2 rounded-lg hover:bg-[#3A3A3A] transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
@@ -272,126 +307,103 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto">
+      <form onSubmit={handleSubmit} className="bg-[#1A1A1A] rounded-lg shadow-xl p-6 w-full max-w-2xl my-8">
         <h2 className="text-xl font-semibold mb-4 text-gray-200">
-          {editingTeacher ? 'Edit Teacher Content' : 'Add Teacher Content'}
+          {editingTeacher ? 'Edit Teacher' : 'Add Teacher'}
         </h2>
-
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
             {error}
           </div>
         )}
-
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-200">Teacher Name</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Teacher Name</label>
             <input
               type="text"
               name="teacher_name"
               value={formData.teacher_name}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-gray-200"
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Enter teacher name"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-200">Subject Name</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Subject</label>
             <input
               type="text"
               name="subject_name"
               value={formData.subject_name}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-gray-200"
-              placeholder="Enter subject name"
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              placeholder="Enter subject"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-200">Grade</label>
-            <div className="flex gap-4">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={selectedGrades.includes('9')}
-                  onChange={() => toggleGrade('9')}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-gray-200">Grade 9</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={selectedGrades.includes('10')}
-                  onChange={() => toggleGrade('10')}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-gray-200">Grade 10</span>
-              </label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[100px]"
+              placeholder="Enter description"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Grade</label>
+            <div className="flex flex-wrap gap-2">
+              {['9', '10'].map((grade) => (
+                <label key={grade} className="flex items-center space-x-2 bg-[#2A2A2A] px-3 py-2 rounded-lg border border-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={selectedGrades.includes(grade)}
+                    onChange={() => toggleGrade(grade)}
+                    className="rounded border-gray-500 text-blue-500 focus:ring-blue-500 bg-[#1A1A1A]"
+                  />
+                  <span className="text-gray-200">Grade {grade}</span>
+                </label>
+              ))}
             </div>
           </div>
-
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-200">Syllabus</label>
-            <div className="flex gap-4">
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={selectedSyllabus.includes('Cambridge')}
-                  onChange={() => toggleSyllabus('Cambridge')}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-gray-200">Cambridge</span>
-              </label>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={selectedSyllabus.includes('Edexcel')}
-                  onChange={() => toggleSyllabus('Edexcel')}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-gray-200">Edexcel</span>
-              </label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Curriculum</label>
+            <div className="flex flex-wrap gap-2">
+              {['Cambridge', 'Edexcel'].map((syl) => (
+                <label key={syl} className="flex items-center space-x-2 bg-[#2A2A2A] px-3 py-2 rounded-lg border border-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={selectedSyllabus.includes(syl)}
+                    onChange={() => toggleSyllabus(syl)}
+                    className="rounded border-gray-500 text-blue-500 focus:ring-blue-500 bg-[#1A1A1A]"
+                  />
+                  <span className="text-gray-200">{syl}</span>
+                </label>
+              ))}
             </div>
           </div>
-
           <div>
-            <label className="block text-sm font-medium mb-2 text-gray-200">Picture ID</label>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Qualifications (one per line)</label>
+            <textarea
+              name="qualifications"
+              value={formData.qualifications}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[100px]"
+              placeholder="Enter qualifications (one per line)"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Picture ID</label>
             <input
               type="text"
               name="picture_id"
               value={formData.picture_id}
               onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-gray-200"
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               placeholder="Enter picture ID"
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-200">Qualifications</label>
-            <textarea
-              name="qualifications"
-              value={formData.qualifications}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-h-[100px] text-gray-200"
-              placeholder="Enter qualifications (one per line)"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-200">Description</label>
-            <textarea
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-h-[150px] text-gray-200"
-              placeholder="Enter teacher description"
-            />
-          </div>
         </div>
-
         <div className="flex space-x-3 mt-6">
           <button 
             type="submit"
@@ -404,7 +416,109 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="bg-gray-600 text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-500 transition-colors disabled:opacity-50"
+            className="bg-[#2A2A2A] text-gray-300 px-4 py-2 rounded-lg hover:bg-[#3A3A3A] transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const CalendarEventEditor = ({ onClose, editingEvent, onSave }: {
+  onClose: () => void;
+  editingEvent?: CalendarEvent;
+  onSave: (data: Omit<CalendarEvent, 'id' | 'created_at'>) => Promise<void>;
+}) => {
+  const [formData, setFormData] = useState({
+    title: editingEvent?.title || '',
+    description: editingEvent?.description || '',
+    event_date: editingEvent?.event_date ? format(new Date(editingEvent.event_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (!formData.title.trim()) {
+        throw new Error('Title is required');
+      }
+      await onSave(formData);
+      onClose();
+    } catch (err) {
+      console.error('Error saving event:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save event');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto">
+      <form onSubmit={handleSubmit} className="bg-[#1A1A1A] rounded-lg shadow-xl p-6 w-full max-w-2xl my-8">
+        <h2 className="text-xl font-semibold mb-4 text-gray-200">
+          {editingEvent ? 'Edit Calendar Event' : 'Add Calendar Event'}
+        </h2>
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Event Title</label>
+            <input
+              type="text"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              placeholder="Enter event title"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Event Date</label>
+            <input
+              type="date"
+              name="event_date"
+              value={formData.event_date}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border rounded-lg bg-[#2A2A2A] border-gray-600 text-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[100px]"
+              placeholder="Enter event description"
+            />
+          </div>
+        </div>
+        <div className="flex space-x-3 mt-6">
+          <button 
+            type="submit"
+            disabled={isLoading}
+            className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+          >
+            {isLoading ? 'Saving...' : editingEvent ? 'Update Event' : 'Save Event'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            className="bg-[#2A2A2A] text-gray-300 px-4 py-2 rounded-lg hover:bg-[#3A3A3A] transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
@@ -415,11 +529,12 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
 };
 
 export default function SiteEditor() {
-  const [activeTab, setActiveTab] = useState<'subjects' | 'teachers'>('subjects');
+  const [activeTab, setActiveTab] = useState<'subjects' | 'teachers' | 'calendar'>('subjects');
   const [showEditor, setShowEditor] = useState(false);
-  const [editingItem, setEditingItem] = useState<Subject | Teacher | null>(null);
+  const [editingItem, setEditingItem] = useState<Subject | Teacher | CalendarEvent | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -435,12 +550,19 @@ export default function SiteEditor() {
           .select('*');
         if (error) throw error;
         setSubjects(data || []);
-      } else {
+      } else if (activeTab === 'teachers') {
         const { data, error } = await supabase
           .from('teachers_content')
           .select('*');
         if (error) throw error;
         setTeachers(data || []);
+      } else if (activeTab === 'calendar') {
+        const { data, error } = await supabase
+          .from('calendar_events')
+          .select('*')
+          .order('event_date', { ascending: true });
+        if (error) throw error;
+        setCalendarEvents(data || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -502,10 +624,31 @@ export default function SiteEditor() {
     }
   };
 
+  const handleSaveCalendarEvent = async (data: Omit<CalendarEvent, 'id' | 'created_at'>) => {
+    try {
+      if (editingItem) {
+        const { error } = await supabase
+          .from('calendar_events')
+          .update(data)
+          .eq('id', (editingItem as CalendarEvent).id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('calendar_events')
+          .insert([data]);
+        if (error) throw error;
+      }
+      fetchData();
+    } catch (error) {
+      console.error('Error saving calendar event:', error);
+      throw error;
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase
-        .from(activeTab === 'subjects' ? 'subjects_content' : 'teachers_content')
+        .from(activeTab === 'subjects' ? 'subjects_content' : activeTab === 'teachers' ? 'teachers_content' : 'calendar_events')
         .delete()
         .eq('id', id);
       if (error) throw error;
@@ -517,7 +660,7 @@ export default function SiteEditor() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+      <div className="bg-[#1A1A1A] rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <div className="flex space-x-4">
             <Tab
@@ -529,6 +672,11 @@ export default function SiteEditor() {
               label="Teachers"
               isActive={activeTab === 'teachers'}
               onClick={() => setActiveTab('teachers')}
+            />
+            <Tab
+              label="Calendar"
+              isActive={activeTab === 'calendar'}
+              onClick={() => setActiveTab('calendar')}
             />
           </div>
           <button
@@ -546,51 +694,72 @@ export default function SiteEditor() {
           <div className="text-center py-8 text-gray-200">Loading...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeTab === 'subjects'
-              ? subjects.map(subject => (
-                  <SubjectCard
-                    key={subject.id}
-                    subject={subject}
-                    onEdit={() => {
-                      setEditingItem(subject);
-                      setShowEditor(true);
-                    }}
-                    onDelete={() => handleDelete(subject.id)}
-                  />
-                ))
-              : teachers.map(teacher => (
-                  <TeacherCard
-                    key={teacher.id}
-                    teacher={teacher}
-                    onEdit={() => {
-                      setEditingItem(teacher);
-                      setShowEditor(true);
-                    }}
-                    onDelete={() => handleDelete(teacher.id)}
-                  />
-                ))}
+            {activeTab === 'subjects' && subjects.map(subject => (
+              <SubjectCard
+                key={subject.id}
+                subject={subject}
+                onEdit={() => {
+                  setEditingItem(subject);
+                  setShowEditor(true);
+                }}
+                onDelete={() => handleDelete(subject.id)}
+              />
+            ))}
+            {activeTab === 'teachers' && teachers.map(teacher => (
+              <TeacherCard
+                key={teacher.id}
+                teacher={teacher}
+                onEdit={() => {
+                  setEditingItem(teacher);
+                  setShowEditor(true);
+                }}
+                onDelete={() => handleDelete(teacher.id)}
+              />
+            ))}
+            {activeTab === 'calendar' && calendarEvents.map(event => (
+              <CalendarEventCard
+                key={event.id}
+                event={event}
+                onEdit={() => {
+                  setEditingItem(event);
+                  setShowEditor(true);
+                }}
+                onDelete={() => handleDelete(event.id)}
+              />
+            ))}
           </div>
         )}
       </div>
 
       {showEditor && (
-        activeTab === 'subjects' 
-          ? <SubjectsEditor 
-              onClose={() => {
-                setShowEditor(false);
-                setEditingItem(null);
-              }}
-              editingSubject={editingItem as Subject}
-              onSave={handleSaveSubject}
-            />
-          : <TeachersEditor 
-              onClose={() => {
-                setShowEditor(false);
-                setEditingItem(null);
-              }}
-              editingTeacher={editingItem as Teacher}
-              onSave={handleSaveTeacher}
-            />
+        activeTab === 'subjects' ? (
+          <SubjectsEditor 
+            onClose={() => {
+              setShowEditor(false);
+              setEditingItem(null);
+            }}
+            editingSubject={editingItem as Subject}
+            onSave={handleSaveSubject}
+          />
+        ) : activeTab === 'teachers' ? (
+          <TeachersEditor 
+            onClose={() => {
+              setShowEditor(false);
+              setEditingItem(null);
+            }}
+            editingTeacher={editingItem as Teacher}
+            onSave={handleSaveTeacher}
+          />
+        ) : (
+          <CalendarEventEditor
+            onClose={() => {
+              setShowEditor(false);
+              setEditingItem(null);
+            }}
+            editingEvent={editingItem as CalendarEvent}
+            onSave={handleSaveCalendarEvent}
+          />
+        )
       )}
     </div>
   );

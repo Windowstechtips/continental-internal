@@ -9,7 +9,6 @@ export default function Navbar() {
   const navigation = [
     { name: 'Schedules', href: 'schedules' },
     { name: 'Edit Schedules', href: 'edit-schedules' },
-    { name: 'Tasks', href: 'tasks' },
     { name: 'News', href: 'news' },
     { name: 'Site Editor', href: 'site-editor' },
     { name: 'Store', href: 'store' },

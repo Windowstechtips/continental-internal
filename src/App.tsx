@@ -3,7 +3,6 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Schedules from './components/Schedules';
 import EditSchedules from './components/EditSchedules';
-import Tasks from './components/Tasks';
 import News from './components/News';
 import PresentationView from './components/PresentationView';
 import SiteEditor from './components/SiteEditor';
@@ -35,7 +34,6 @@ export default function App() {
           <Route index element={<Schedules />} />
           <Route path="schedules" element={<Schedules />} />
           <Route path="edit-schedules" element={<EditSchedules />} />
-          <Route path="tasks" element={<Tasks />} />
           <Route path="news" element={<News />} />
           <Route path="site-editor" element={<SiteEditor />} />
           <Route path="store/*" element={<Store />} />
