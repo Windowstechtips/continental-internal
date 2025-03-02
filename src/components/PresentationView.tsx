@@ -30,11 +30,10 @@ export default function PresentationView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [activeFilter, setActiveFilter] = useState<'status' | 'grade' | 'teacher'>('status');
-  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
-  const [selectedTeacher, setSelectedTeacher] = useState<number | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'grade' | 'teacher'>('grade');
   const [uniqueGrades, setUniqueGrades] = useState<string[]>([]);
   const [uniqueTeachers, setUniqueTeachers] = useState<Teacher[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Request fullscreen on component mount
   useEffect(() => {

@@ -17,7 +17,6 @@ export default function MainGallery() {
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showUploader, setShowUploader] = useState(false);
   const [editingTags, setEditingTags] = useState<string | null>(null);
   const [editingTagsId, setEditingTagsId] = useState<string | null>(null);
   const [searchTag, setSearchTag] = useState<string | null>(null);
@@ -201,7 +200,7 @@ export default function MainGallery() {
           <h1 className="text-2xl font-bold text-white">Image Gallery</h1>
           
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <div className="relative flex-grow">
+            <form onSubmit={handleSearch} className="relative flex-grow">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
               </div>
@@ -214,13 +213,14 @@ export default function MainGallery() {
               />
               {searchTag && (
                 <button
-                  onClick={() => setSearchTag('')}
+                  type="button"
+                  onClick={handleClearSearch}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200"
                 >
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               )}
-            </div>
+            </form>
             
             <button
               onClick={() => setShowAddModal(true)}
