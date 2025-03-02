@@ -8,7 +8,6 @@ import PresentationView from './components/PresentationView';
 import SiteEditor from './components/SiteEditor';
 import Store from './components/Store/Store';
 import Images from './components/Images';
-import MainGallery from './components/MainGallery';
 
 export default function App() {
   // Check if user is authenticated

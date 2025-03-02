@@ -15,16 +15,16 @@ interface GalleryImage {
 export default function MainGallery() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [images, setImages] = useState<GalleryImage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTag, setSearchTag] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [editingTags, setEditingTags] = useState<{ id: string, tags: string } | null>(null);
-  const [isUpdatingTags, setIsUpdatingTags] = useState(false);
+  const [showUploader, setShowUploader] = useState(false);
+  const [editingTags, setEditingTags] = useState<string | null>(null);
+  const [editingTagsId, setEditingTagsId] = useState<string | null>(null);
+  const [searchTag, setSearchTag] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const fetchImages = async (tag?: string) => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     
     try {
@@ -54,8 +54,7 @@ export default function MainGallery() {
       console.error('Error in fetchImages:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
-      setIsSearching(false);
+      setLoading(false);
     }
   };
 
@@ -64,7 +63,7 @@ export default function MainGallery() {
       return;
     }
     
-    setIsDeleting(id);
+    setConfirmDelete(id);
     
     try {
       // Ensure we're authenticated before deleting
@@ -108,7 +107,7 @@ export default function MainGallery() {
       console.error('Error deleting image:', err);
       alert('Failed to delete the image. Please try again.');
     } finally {
-      setIsDeleting(null);
+      setConfirmDelete(null);
     }
   };
 
@@ -135,29 +134,25 @@ export default function MainGallery() {
   };
 
   const handleEditTags = (id: string, tagsString: string) => {
-    setEditingTags({ id, tags: tagsString });
+    setEditingTags(tagsString);
+    setEditingTagsId(id);
   };
 
   const handleSaveTags = async () => {
-    if (!editingTags) return;
-    
-    setIsUpdatingTags(true);
+    if (!editingTags || !editingTagsId) return;
     
     try {
       // Ensure we're authenticated before updating
       await ensureAuthenticated();
       
       // Parse tags from comma-separated string
-      const tagsArray = editingTags.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
+      const tagsArray = editingTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
       
       // Update in Supabase
       const { error } = await supabase
         .from('gallery_images')
         .update({ tags: tagsArray })
-        .eq('id', editingTags.id);
+        .eq('id', editingTagsId);
       
       if (error) {
         throw error;
@@ -165,19 +160,18 @@ export default function MainGallery() {
       
       // Update local state
       setImages(images.map(img => 
-        img.id === editingTags.id 
+        img.id === editingTagsId 
           ? { ...img, tags: tagsArray } 
           : img
       ));
       
       // Close the modal
       setEditingTags(null);
+      setEditingTagsId(null);
       
     } catch (err) {
       console.error('Error updating tags:', err);
       alert('Failed to update tags. Please try again.');
-    } finally {
-      setIsUpdatingTags(false);
     }
   };
 
@@ -187,12 +181,11 @@ export default function MainGallery() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSearching(true);
-    fetchImages(searchTag);
+    fetchImages(searchTag as string);
   };
 
   const handleClearSearch = () => {
-    setSearchTag('');
+    setSearchTag(null);
     fetchImages();
   };
 
@@ -214,7 +207,7 @@ export default function MainGallery() {
               </div>
               <input
                 type="text"
-                value={searchTag}
+                value={searchTag as string}
                 onChange={(e) => setSearchTag(e.target.value)}
                 placeholder="Search by tag..."
                 className="w-full pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
@@ -246,7 +239,7 @@ export default function MainGallery() {
           </div>
         )}
         
-        {isLoading ? (
+        {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-12 h-12 rounded-full border-4 border-gray-600 border-t-blue-500 animate-spin mb-4"></div>
             <p className="text-gray-400">Loading images...</p>
@@ -296,19 +289,25 @@ export default function MainGallery() {
                 <div className="p-4 flex justify-between items-center">
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleEditTags(image.id, image.tags.join(', '))}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditTags(image.id, image.tags.join(', '));
+                      }}
                       className="p-1.5 rounded-full hover:bg-blue-500/20 transition-all duration-200"
                       aria-label="Edit tags"
                     >
                       <PencilIcon className="h-5 w-5 text-blue-400" />
                     </button>
                     <button
-                      onClick={() => handleRemoveImage(image.id, image.public_id)}
-                      disabled={isDeleting === image.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveImage(image.id, image.public_id);
+                      }}
+                      disabled={confirmDelete === image.id}
                       className="p-1.5 rounded-full hover:bg-red-500/20 transition-all duration-200 disabled:opacity-50"
                       aria-label="Delete image"
                     >
-                      {isDeleting === image.id ? (
+                      {confirmDelete === image.id ? (
                         <div className="h-5 w-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div>
                       ) : (
                         <TrashIcon className="h-5 w-5 text-red-400" />
@@ -327,7 +326,7 @@ export default function MainGallery() {
       </div>
       
       {/* Tag Editing Modal */}
-      {editingTags && (
+      {editingTags && editingTagsId && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-dark-card border border-gray-800 rounded-xl shadow-glass-strong p-6 w-full max-w-md animate-slideUp">
             <h2 className="text-xl font-bold text-white mb-4">Edit Tags</h2>
@@ -338,8 +337,8 @@ export default function MainGallery() {
               </label>
               <input
                 type="text"
-                value={editingTags.tags}
-                onChange={(e) => setEditingTags({ ...editingTags, tags: e.target.value })}
+                value={editingTags}
+                onChange={(e) => setEditingTags(e.target.value)}
                 className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="tag1, tag2, tag3"
               />
@@ -347,25 +346,20 @@ export default function MainGallery() {
             
             <div className="flex justify-end space-x-3">
               <button
-                onClick={() => setEditingTags(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingTags(null);
+                  setEditingTagsId(null);
+                }}
                 className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
-                disabled={isUpdatingTags}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleSaveTags()}
-                disabled={isUpdatingTags}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-300 disabled:opacity-50 flex items-center"
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all duration-300"
               >
-                {isUpdatingTags ? (
-                  <>
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Saving...
-                  </>
-                ) : (
-                  'Save Tags'
-                )}
+                Save Tags
               </button>
             </div>
           </div>

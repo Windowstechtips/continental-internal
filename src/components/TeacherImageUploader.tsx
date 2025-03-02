@@ -12,7 +12,6 @@ export default function TeacherImageUploader({ onImageUploaded, initialImageUrl 
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialImageUrl || null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadStage, setUploadStage] = useState<'idle' | 'uploading'>('idle');
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -21,7 +20,6 @@ export default function TeacherImageUploader({ onImageUploaded, initialImageUrl 
     // Reset states
     setError(null);
     setUploadProgress(0);
-    setUploadStage('idle');
 
     // Validate file type
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -45,7 +43,6 @@ export default function TeacherImageUploader({ onImageUploaded, initialImageUrl 
 
     // Start upload process
     setIsUploading(true);
-    setUploadStage('uploading');
 
     // Create form data for upload
     const formData = new FormData();
@@ -80,7 +77,6 @@ export default function TeacherImageUploader({ onImageUploaded, initialImageUrl 
           
           // Reset states
           setIsUploading(false);
-          setUploadStage('idle');
           
         } else {
           let errorMsg = 'Upload failed. Please try again.';
@@ -93,7 +89,6 @@ export default function TeacherImageUploader({ onImageUploaded, initialImageUrl 
           console.error('Upload failed:', xhr.responseText);
           setError(`Cloudinary error: ${errorMsg}`);
           setIsUploading(false);
-          setUploadStage('idle');
         }
       };
       
@@ -102,7 +97,6 @@ export default function TeacherImageUploader({ onImageUploaded, initialImageUrl 
         console.error('Network error during upload');
         setError('Network error. Please check your internet connection and try again.');
         setIsUploading(false);
-        setUploadStage('idle');
       };
       
       // Send the request
@@ -111,7 +105,6 @@ export default function TeacherImageUploader({ onImageUploaded, initialImageUrl 
       console.error('Error during upload:', err);
       setError('An unexpected error occurred. Please try again.');
       setIsUploading(false);
-      setUploadStage('idle');
     }
   };
 

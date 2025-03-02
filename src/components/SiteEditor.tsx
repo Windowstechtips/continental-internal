@@ -371,10 +371,12 @@ const TeachersEditor = ({ onClose, editingTeacher, onSave }: {
     );
   };
 
-  const handleImageUploaded = (imageUrl: string, publicId: string) => {
-    // Store the image URL in the picture_id field
-    setFormData(prev => ({ ...prev, picture_id: imageUrl }));
-    setImageUrl(imageUrl);
+  const handleImageUploaded = (imageUrl: string, _publicId: string) => {
+    // Using _publicId with underscore to indicate it's intentionally unused
+    setFormData({
+      ...formData,
+      picture_id: imageUrl
+    });
   };
 
   return (

@@ -191,41 +191,41 @@ export default function PresentationView() {
 
     return (
       <div 
-        className={`relative rounded-xl ${isCompact ? 'p-2.5' : 'p-3.5'} glass-dark border transition-all ${
+        className={`relative rounded-xl ${isCompact ? 'p-2' : 'p-3.5'} glass-dark border transition-all ${
           isPast ? 'opacity-60 border-gray-800/30' :
           isCanceledToday ? 'border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 
           isActive ? 'border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]' :
           isUpcoming ? 'border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]' :
           'border-gray-800/50'
-        }`}
+        } overflow-hidden`}
       >
         {/* Status indicator and time in a single row */}
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex justify-between items-center mb-1">
           <div>
             {isCanceledToday ? (
-              <span className="px-2 py-1 rounded-md text-xs font-medium bg-red-900/30 text-red-400 border border-red-500/30">
+              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-red-900/30 text-red-400 border border-red-500/30`}>
                 Canceled
               </span>
             ) : isActive ? (
-              <span className="px-2 py-1 rounded-md text-xs font-medium bg-emerald-900/30 text-emerald-400 border border-emerald-500/30">
+              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-emerald-900/30 text-emerald-400 border border-emerald-500/30`}>
                 In Progress
               </span>
             ) : isUpcoming ? (
-              <span className="px-2 py-1 rounded-md text-xs font-medium bg-blue-900/30 text-blue-400 border border-blue-500/30">
+              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-blue-900/30 text-blue-400 border border-blue-500/30`}>
                 Up Next
               </span>
             ) : (
-              <span className="px-2 py-1 rounded-md text-xs font-medium bg-gray-800/50 text-gray-400 border border-gray-700/30">
+              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-gray-800/50 text-gray-400 border border-gray-700/30`}>
                 Completed
               </span>
             )}
           </div>
           <div className="text-right font-medium text-base">
             <span className="bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
-            {(() => {
-              const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
-              const startDate = new Date();
-              startDate.setHours(startHour, startMinute);
+              {(() => {
+                const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
+                const startDate = new Date();
+                startDate.setHours(startHour, startMinute);
                 return format(startDate, 'h:mm');
               })()}
               <span className="mx-0.5">-</span>
@@ -237,12 +237,12 @@ export default function PresentationView() {
               })()}
             </span>
             <span className="text-xs text-gray-400 ml-1">
-            {(() => {
-              const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
-              const endDate = new Date();
-              endDate.setHours(endHour, endMinute);
+              {(() => {
+                const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
+                const endDate = new Date();
+                endDate.setHours(endHour, endMinute);
                 return format(endDate, 'a');
-            })()}
+              })()}
             </span>
           </div>
         </div>
@@ -250,47 +250,47 @@ export default function PresentationView() {
         {/* Schedule info - more compact layout */}
         <div>
           {/* Teacher name and subject as main titles */}
-          <div className="mb-2">
+          <div className={`${isCompact ? 'mb-1' : 'mb-2'}`}>
             <div className="flex flex-col">
-              <h3 className="text-sm text-gray-300">
+              <h3 className={`${isCompact ? 'text-xs' : 'text-sm'} text-gray-300`}>
                 {schedule.teachers?.name}
               </h3>
-              <h2 className={`${isCompact ? 'text-2xl' : 'text-3xl'} font-bold bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent`}>
+              <h2 className={`${isCompact ? 'text-lg' : 'text-2xl'} font-bold bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent`}>
                 {schedule.subject}
               </h2>
             </div>
           </div>
           
           {/* Redesigned Grade and Curriculum information - inline for space efficiency */}
-          <div className="flex flex-wrap gap-2 mb-2">
-            <div className="bg-gradient-to-br from-sky-900/40 to-blue-800/20 px-2 py-1 rounded-lg border border-sky-700/30">
+          <div className={`flex flex-wrap gap-1 ${isCompact ? 'mb-1' : 'mb-2'}`}>
+            <div className="bg-gradient-to-br from-sky-900/40 to-blue-800/20 px-1.5 py-0.5 rounded-lg border border-sky-700/30">
               <div className="flex items-center">
-                <span className="text-sky-400 text-xs font-medium mr-1">Grade:</span>
-                <span className="text-xs font-semibold text-white">{schedule.grade}</span>
+                <span className={`text-sky-400 ${isCompact ? 'text-[10px]' : 'text-xs'} font-medium mr-1`}>Grade:</span>
+                <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-semibold text-white`}>{schedule.grade}</span>
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-blue-900/40 to-cyan-800/20 px-2 py-1 rounded-lg border border-blue-700/30">
+            <div className="bg-gradient-to-br from-blue-900/40 to-cyan-800/20 px-1.5 py-0.5 rounded-lg border border-blue-700/30">
               <div className="flex items-center">
-                <span className="text-cyan-400 text-xs font-medium mr-1">Curriculum:</span>
-                <span className="text-xs font-semibold text-white">{schedule.curriculum}</span>
+                <span className={`text-cyan-400 ${isCompact ? 'text-[10px]' : 'text-xs'} font-medium mr-1`}>Curriculum:</span>
+                <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-semibold text-white`}>{schedule.curriculum}</span>
               </div>
             </div>
             
             {/* Room information if available - inline with grade and curriculum */}
             {schedule.room && (
-              <div className="inline-flex items-center px-2 py-1 bg-gradient-to-r from-gray-800/60 to-gray-700/60 rounded-lg border border-gray-700/50">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-gray-400 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="inline-flex items-center px-1.5 py-0.5 bg-gradient-to-r from-gray-800/60 to-gray-700/60 rounded-lg border border-gray-700/50">
+                <svg xmlns="http://www.w3.org/2000/svg" className={`${isCompact ? 'h-2 w-2' : 'h-3 w-3'} text-gray-400 mr-1`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <span className="text-xs font-medium text-gray-200">Room {schedule.room}</span>
+                <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-medium text-gray-200`}>Room {schedule.room}</span>
               </div>
             )}
           </div>
           
           {/* Description - more compact */}
           {displayDescription && (
-            <div className="mt-2 mb-2">
+            <div className="mt-2 mb-1">
               <div className="p-2 bg-gradient-to-br from-gray-900/40 to-gray-800/20 rounded-lg border border-gray-800/50">
                 <p className="text-xs text-gray-200 whitespace-pre-wrap leading-relaxed">
                   {displayDescription}
@@ -300,19 +300,12 @@ export default function PresentationView() {
           )}
         </div>
         
-        {/* Progress bar for active classes - integrated into bottom of card */}
+        {/* Progress bar for active classes - simple green line at bottom of card */}
         {isActive && !isCanceledToday && (
-          <div className="mt-1">
-            <div className="h-1.5 bg-gray-800/80 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-1000 ease-in-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <div className="flex justify-center mt-0.5">
-              <p className="text-xs text-emerald-400 font-medium">{Math.round(progress)}%</p>
-            </div>
-          </div>
+          <div 
+            className="absolute bottom-0 left-0 h-1 bg-emerald-500"
+            style={{ width: `${progress}%` }}
+          />
         )}
       </div>
     );
@@ -333,20 +326,32 @@ export default function PresentationView() {
     <div className="h-screen bg-[#0a0a0a] overflow-y-auto relative">
       {/* Enhanced background decorative elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {/* Primary gradient mesh - larger, more diffused gradients */}
-        <div className="absolute -top-[10%] right-[5%] w-[80vw] h-[70vh] bg-gradient-to-bl from-blue-600/8 via-blue-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
-        <div className="absolute -bottom-[10%] left-[5%] w-[80vw] h-[70vh] bg-gradient-to-tr from-blue-500/8 via-blue-300/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
+        {/* Primary gradient mesh - larger, more diffused gradients with increased opacity */}
+        <div className="absolute -top-[10%] right-[5%] w-[90vw] h-[80vh] bg-gradient-to-bl from-blue-600/15 via-blue-400/10 to-transparent rounded-[100%] filter blur-[80px] animate-pulse-slow" style={{ animationDelay: '0s' }}></div>
+        <div className="absolute -bottom-[10%] left-[5%] w-[90vw] h-[80vh] bg-gradient-to-tr from-blue-500/15 via-blue-300/10 to-transparent rounded-[100%] filter blur-[80px] animate-pulse-slow" style={{ animationDelay: '4s' }}></div>
         
-        {/* Secondary gradient accents - smaller, more vibrant */}
-        <div className="absolute top-[25%] left-[15%] w-[40vw] h-[40vh] bg-gradient-to-r from-cyan-500/5 to-blue-400/5 rounded-full filter blur-[60px] animate-pulse-slow"></div>
-        <div className="absolute bottom-[25%] right-[15%] w-[40vw] h-[40vh] bg-gradient-to-r from-blue-500/5 to-sky-400/5 rounded-full filter blur-[60px] animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+        {/* Secondary gradient accents - more vibrant with increased opacity */}
+        <div className="absolute top-[25%] left-[15%] w-[50vw] h-[50vh] bg-gradient-to-r from-cyan-500/15 to-blue-400/10 rounded-full filter blur-[60px] animate-pulse-slow animate-float" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-[25%] right-[15%] w-[50vw] h-[50vh] bg-gradient-to-r from-blue-500/15 to-sky-400/10 rounded-full filter blur-[60px] animate-pulse-slow animate-float" style={{ animationDelay: '6s' }}></div>
         
-        {/* Tertiary accent points - small, subtle light sources */}
-        <div className="absolute top-[40%] right-[30%] w-[15vw] h-[15vh] bg-blue-400/3 rounded-full filter blur-[40px] animate-float" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-[40%] left-[30%] w-[15vw] h-[15vh] bg-sky-400/3 rounded-full filter blur-[40px] animate-float" style={{ animationDelay: '3s' }}></div>
+        {/* Additional vibrant accent points */}
+        <div className="absolute top-[15%] right-[20%] w-[30vw] h-[30vh] bg-gradient-to-r from-purple-500/10 to-indigo-400/8 rounded-full filter blur-[70px] animate-pulse-slow animate-float" style={{ animationDelay: '3s' }}></div>
+        <div className="absolute bottom-[15%] left-[20%] w-[30vw] h-[30vh] bg-gradient-to-r from-indigo-500/10 to-purple-400/8 rounded-full filter blur-[70px] animate-pulse-slow animate-float" style={{ animationDelay: '7s' }}></div>
         
-        {/* Grain overlay for texture */}
-        <div className="absolute inset-0 opacity-[0.15] mix-blend-overlay bg-noise"></div>
+        {/* Tertiary accent points - brighter light sources */}
+        <div className="absolute top-[40%] right-[30%] w-[20vw] h-[20vh] bg-blue-400/8 rounded-full filter blur-[40px] animate-float animate-glow" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-[40%] left-[30%] w-[20vw] h-[20vh] bg-sky-400/8 rounded-full filter blur-[40px] animate-float animate-glow" style={{ animationDelay: '5s' }}></div>
+        
+        {/* Focal point highlights - small but intense light spots */}
+        <div className="absolute top-[30%] left-[40%] w-[8vw] h-[8vh] bg-blue-300/15 rounded-full filter blur-[20px] animate-pulse-slow animate-glow" style={{ animationDelay: '2.5s' }}></div>
+        <div className="absolute bottom-[30%] right-[40%] w-[8vw] h-[8vh] bg-cyan-300/15 rounded-full filter blur-[20px] animate-pulse-slow animate-glow" style={{ animationDelay: '5.5s' }}></div>
+        
+        {/* New dynamic color spots */}
+        <div className="absolute top-[60%] right-[10%] w-[15vw] h-[15vh] bg-gradient-to-r from-pink-500/12 to-rose-400/8 rounded-full filter blur-[30px] animate-float animate-glow" style={{ animationDelay: '4.5s' }}></div>
+        <div className="absolute bottom-[60%] left-[10%] w-[15vw] h-[15vh] bg-gradient-to-r from-amber-500/12 to-yellow-400/8 rounded-full filter blur-[30px] animate-float animate-glow" style={{ animationDelay: '3.5s' }}></div>
+        
+        {/* Subtle grain overlay for texture */}
+        <div className="absolute inset-0 bg-noise"></div>
       </div>
 
       {/* Content container */}
@@ -364,12 +369,12 @@ export default function PresentationView() {
                 </div>
                 <div>
                   <h1 className="text-3xl lg:text-4xl font-extralight text-white tracking-tight">
-            {format(currentTime, 'EEEE')}
-          </h1>
+                    {format(currentTime, 'EEEE')}
+                  </h1>
                   <p className="text-lg lg:text-xl font-light text-gray-400">
-            {format(currentTime, 'MMMM d, yyyy')}
-          </p>
-        </div>
+                    {format(currentTime, 'MMMM d, yyyy')}
+                  </p>
+                </div>
               </div>
               <div>
                 <div className="text-4xl lg:text-5xl font-extralight tracking-tighter text-transparent bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text">
@@ -381,107 +386,22 @@ export default function PresentationView() {
           </div>
         </header>
 
-        {/* Filter tabs */}
-        <div className="mb-6">
-          <div className="glass-dark rounded-xl p-2 border border-gray-800/30 shadow-glass-strong backdrop-blur-md">
-            <div className="flex flex-wrap gap-2">
-              {/* Filter type tabs */}
-              <div className="flex rounded-lg bg-gray-900/50 p-1">
-                <button
-                  onClick={() => {
-                    setActiveFilter('status');
-                    setSelectedGrade(null);
-                    setSelectedTeacher(null);
-                  }}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    activeFilter === 'status'
-                      ? 'bg-gradient-to-r from-blue-500/80 to-sky-500/80 text-white shadow-md'
-                      : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
-                  }`}
-                >
-                  By Status
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveFilter('grade');
-                    setSelectedTeacher(null);
-                  }}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    activeFilter === 'grade'
-                      ? 'bg-gradient-to-r from-blue-500/80 to-sky-500/80 text-white shadow-md'
-                      : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
-                  }`}
-                >
-                  By Grade
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveFilter('teacher');
-                    setSelectedGrade(null);
-                  }}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    activeFilter === 'teacher'
-                      ? 'bg-gradient-to-r from-blue-500/80 to-sky-500/80 text-white shadow-md'
-                      : 'text-gray-300 hover:text-white hover:bg-gray-800/50'
-                  }`}
-                >
-                  By Teacher
-                </button>
-              </div>
-              
-              {/* Grade filter options - show when grade filter is active */}
-              {activeFilter === 'grade' && (
-                <div className="flex flex-wrap gap-1 ml-1">
-                  {uniqueGrades.map(grade => (
-                    <button
-                      key={grade}
-                      onClick={() => setSelectedGrade(selectedGrade === grade ? null : grade)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                        selectedGrade === grade
-                          ? 'bg-gradient-to-r from-sky-500/80 to-cyan-500/80 text-white shadow-md'
-                          : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
-                      }`}
-                    >
-                      {grade}
-                    </button>
-                  ))}
-                  {selectedGrade && (
-                    <button
-                      onClick={() => setSelectedGrade(null)}
-                      className="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 transition-all"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              )}
-              
-              {/* Teacher filter options - show when teacher filter is active */}
-              {activeFilter === 'teacher' && (
-                <div className="flex flex-wrap gap-1 ml-1">
-                  {uniqueTeachers.map(teacher => (
-                    <button
-                      key={teacher.id}
-                      onClick={() => setSelectedTeacher(selectedTeacher === teacher.id ? null : teacher.id)}
-                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                        selectedTeacher === teacher.id
-                          ? 'bg-gradient-to-r from-blue-500/80 to-indigo-500/80 text-white shadow-md'
-                          : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
-                      }`}
-                    >
-                      {teacher.name}
-                    </button>
-                  ))}
-                  {selectedTeacher && (
-                    <button
-                      onClick={() => setSelectedTeacher(null)}
-                      className="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-800/50 text-gray-300 hover:bg-gray-700/50 transition-all"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              )}
+        {/* Filter dropdown button */}
+        <div className="mb-6 relative">
+          <div className="flex justify-end">
+            <div className="relative">
+              <button
+                onClick={() => setActiveFilter(activeFilter === 'status' ? 'grade' : activeFilter === 'grade' ? 'teacher' : 'status')}
+                className="glass-dark rounded-xl px-4 py-2 border border-gray-800/30 shadow-glass-strong backdrop-blur-md flex items-center gap-2 hover:bg-gray-800/30 transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="text-gray-300">
+                  {activeFilter === 'status' ? 'Status' : 
+                   activeFilter === 'grade' ? 'Grade' : 'Teacher'}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -490,7 +410,7 @@ export default function PresentationView() {
         <main>
           {error ? (
             <div className="glass-dark rounded-xl p-4 border border-red-800/30 shadow-glass-strong backdrop-blur-md">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-red-900/30 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -528,206 +448,172 @@ export default function PresentationView() {
                         <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">In Progress</h2>
                       </div>
                       <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {schedules
-                    .filter(isScheduleActive)
-                    .map(schedule => (
-                      <ScheduleCard key={schedule.id} schedule={schedule} />
-                    ))}
-                </div>
+                        {schedules
+                          .filter(isScheduleActive)
+                          .map(schedule => (
+                            <ScheduleCard key={schedule.id} schedule={schedule} />
+                          ))}
+                      </div>
                     </section>
-            )}
+                  )}
 
-            {/* Upcoming Classes */}
-            {schedules.some(s => isScheduleUpcoming(s)) && (
+                  {/* Upcoming Classes */}
+                  {schedules.some(s => isScheduleUpcoming(s)) && (
                     <section className="space-y-4">
                       <div className="flex items-center gap-3 px-2 mb-2">
                         <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                         <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">Up Next</h2>
-                </div>
+                      </div>
                       <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {schedules
-                    .filter(isScheduleUpcoming)
-                    .sort((a, b) => {
-                      const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                      const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                      return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                    })
-                    .map(schedule => (
-                      <ScheduleCard key={schedule.id} schedule={schedule} />
-                    ))}
-                </div>
+                        {schedules
+                          .filter(isScheduleUpcoming)
+                          .sort((a, b) => {
+                            const [aHour, aMinute] = a.start_time.split(':').map(Number);
+                            const [bHour, bMinute] = b.start_time.split(':').map(Number);
+                            return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
+                          })
+                          .map(schedule => (
+                            <ScheduleCard key={schedule.id} schedule={schedule} />
+                          ))}
+                      </div>
                     </section>
-            )}
+                  )}
 
-            {/* Past Classes */}
-            {schedules.some(isSchedulePast) && (
+                  {/* Past Classes */}
+                  {schedules.some(isSchedulePast) && (
                     <section className="space-y-4">
                       <div className="flex items-center gap-3 px-2 mb-2">
                         <div className="w-3 h-3 rounded-full bg-gray-500"></div>
                         <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-gray-400 to-gray-500 bg-clip-text text-transparent">Completed</h2>
                       </div>
                       <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {schedules
-                    .filter(isSchedulePast)
-                    .sort((a, b) => {
-                      const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                      const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                      return (bHour * 60 + bMinute) - (aHour * 60 + aMinute);
-                    })
-                    .map(schedule => (
-                      <ScheduleCard key={schedule.id} schedule={schedule} />
-                    ))}
-                </div>
-                    </section>
-                  )}
-                </>
-              )}
-
-              {/* Grade Filter View */}
-              {activeFilter === 'grade' && (
-                <>
-                  {selectedGrade ? (
-                    <section className="space-y-4">
-                      <div className="flex items-center gap-3 px-2 mb-2">
-                        <div className="w-3 h-3 rounded-full bg-sky-500"></div>
-                        <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
-                          Grade {selectedGrade}
-                        </h2>
-                      </div>
-                      <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                         {schedules
-                          .filter(schedule => schedule.grade === selectedGrade)
+                          .filter(isSchedulePast)
                           .sort((a, b) => {
-                            // Sort by status first (active, upcoming, past), then by time
-                            if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
-                            if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
-                            if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
-                            if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
-                            
-                            // If same status, sort by time
                             const [aHour, aMinute] = a.start_time.split(':').map(Number);
                             const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                            return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
+                            return (bHour * 60 + bMinute) - (aHour * 60 + aMinute);
                           })
                           .map(schedule => (
                             <ScheduleCard key={schedule.id} schedule={schedule} />
                           ))}
                       </div>
                     </section>
-                  ) : (
-                    // Show all grades when no grade is selected
-                    <>
-                      {uniqueGrades.map(grade => {
-                        const gradeSchedules = schedules.filter(s => s.grade === grade);
-                        if (gradeSchedules.length === 0) return null;
-                        
-                        return (
-                          <section key={grade} className="space-y-4">
-                            <div className="flex items-center gap-3 px-2 mb-2">
-                              <div className="w-3 h-3 rounded-full bg-sky-500"></div>
-                              <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
-                                Grade {grade}
-                              </h2>
-                            </div>
-                            <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                              {gradeSchedules
-                                .sort((a, b) => {
-                                  // Sort by status first (active, upcoming, past), then by time
-                                  if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
-                                  if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
-                                  if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
-                                  if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
-                                  
-                                  // If same status, sort by time
-                                  const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                                  const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                                  return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                                })
-                                .map(schedule => (
-                                  <ScheduleCard key={schedule.id} schedule={schedule} />
-                                ))}
-                            </div>
-                          </section>
-                        );
-                      })}
-                    </>
                   )}
                 </>
+              )}
+
+              {/* Grade Filter View - Simplified to just sort by grade */}
+              {activeFilter === 'grade' && (
+                <div className="space-y-8">
+                  {uniqueGrades.map(grade => {
+                    const gradeSchedules = schedules.filter(s => s.grade === grade);
+                    if (gradeSchedules.length === 0) return null;
+                    
+                    return (
+                      <section key={grade} className="space-y-4">
+                        <div className="flex items-center gap-3 px-2 mb-2">
+                          <div className="w-3 h-3 rounded-full bg-sky-500"></div>
+                          <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
+                            Grade {grade}
+                          </h2>
+                        </div>
+                        <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                          {gradeSchedules
+                            .sort((a, b) => {
+                              // Sort by status first (active, upcoming, past), then by time
+                              if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
+                              if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
+                              if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
+                              if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
+                              
+                              // If same status, sort by time
+                              const [aHour, aMinute] = a.start_time.split(':').map(Number);
+                              const [bHour, bMinute] = b.start_time.split(':').map(Number);
+                              return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
+                            })
+                            .map(schedule => (
+                              <ScheduleCard key={schedule.id} schedule={schedule} />
+                            ))}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
               )}
 
               {/* Teacher Filter View */}
               {activeFilter === 'teacher' && (
-                <>
-                  {selectedTeacher ? (
-                    <section className="space-y-4">
-                      <div className="flex items-center gap-3 px-2 mb-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
-                          {uniqueTeachers.find(t => t.id === selectedTeacher)?.name}
-                        </h2>
-                      </div>
-                      <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                        {schedules
-                          .filter(schedule => schedule.teacher_id === selectedTeacher)
-                          .sort((a, b) => {
-                            // Sort by status first (active, upcoming, past), then by time
-                            if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
-                            if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
-                            if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
-                            if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
-                            
-                            // If same status, sort by time
-                            const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                            const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                            return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                          })
-                          .map(schedule => (
-                            <ScheduleCard key={schedule.id} schedule={schedule} />
-                          ))}
-                      </div>
-                    </section>
-                  ) : (
-                    // Show all teachers when no teacher is selected
-                    <>
-                      {uniqueTeachers.map(teacher => {
-                        const teacherSchedules = schedules.filter(s => s.teacher_id === teacher.id);
-                        if (teacherSchedules.length === 0) return null;
-                        
-                        return (
-                          <section key={teacher.id} className="space-y-4">
-                            <div className="flex items-center gap-3 px-2 mb-2">
-                              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                              <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
-                                {teacher.name}
-                              </h2>
-                            </div>
-                            <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                              {teacherSchedules
-                                .sort((a, b) => {
-                                  // Sort by status first (active, upcoming, past), then by time
-                                  if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
-                                  if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
-                                  if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
-                                  if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
-                                  
-                                  // If same status, sort by time
-                                  const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                                  const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                                  return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                                })
-                                .map(schedule => (
-                                  <ScheduleCard key={schedule.id} schedule={schedule} />
-                                ))}
-              </div>
-                          </section>
-                        );
-                      })}
-                    </>
-                  )}
-                </>
-            )}
-          </div>
-        )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {uniqueTeachers
+                    .sort((a, b) => {
+                      // Check if teacher has any completed (past) schedules
+                      const aSchedules = schedules.filter(s => s.teacher_id === a.id);
+                      const bSchedules = schedules.filter(s => s.teacher_id === b.id);
+                      
+                      const aHasCompletedSchedules = aSchedules.some(isSchedulePast);
+                      const bHasCompletedSchedules = bSchedules.some(isSchedulePast);
+                      
+                      // Sort teachers with completed schedules to the right
+                      if (aHasCompletedSchedules && !bHasCompletedSchedules) return 1;
+                      if (!aHasCompletedSchedules && bHasCompletedSchedules) return -1;
+                      
+                      // If both have or don't have completed schedules, sort alphabetically by name
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map(teacher => {
+                      const teacherSchedules = schedules.filter(s => s.teacher_id === teacher.id);
+                      if (teacherSchedules.length === 0) return null;
+                      
+                      // Check if this teacher has any completed schedules
+                      const hasCompletedSchedules = teacherSchedules.some(isSchedulePast);
+                      
+                      return (
+                        <div 
+                          key={teacher.id} 
+                          className={`glass-dark rounded-xl p-4 border ${
+                            hasCompletedSchedules 
+                              ? 'border-gray-700/30 bg-gradient-to-br from-gray-900/60 to-gray-800/60' 
+                              : 'border-gray-800/30'
+                          }`}
+                        >
+                          <h2 className={`text-xl font-medium mb-4 ${
+                            hasCompletedSchedules 
+                              ? 'text-gray-300' 
+                              : 'text-white'
+                          }`}>
+                            {teacher.name}
+                            {hasCompletedSchedules && (
+                              <span className="ml-2 px-1.5 py-0.5 text-xs rounded-md bg-gray-800/50 text-gray-400 border border-gray-700/30">
+                                Has Completed
+                              </span>
+                            )}
+                          </h2>
+                          <div className="space-y-3">
+                            {teacherSchedules
+                              .sort((a, b) => {
+                                // Sort by status (active, upcoming, past)
+                                if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
+                                if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
+                                if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
+                                if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
+                                
+                                // If same status, sort by time
+                                const [aHour, aMinute] = a.start_time.split(':').map(Number);
+                                const [bHour, bMinute] = b.start_time.split(':').map(Number);
+                                return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
+                              })
+                              .map(schedule => (
+                                <ScheduleCard key={schedule.id} schedule={schedule} />
+                              ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          )}
         </main>
         
         {/* Footer */}
