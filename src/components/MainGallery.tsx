@@ -206,7 +206,7 @@ export default function MainGallery() {
               </div>
               <input
                 type="text"
-                value={searchTag as string}
+                value={searchTag || ''}
                 onChange={(e) => setSearchTag(e.target.value)}
                 placeholder="Search by tag..."
                 className="w-full pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"

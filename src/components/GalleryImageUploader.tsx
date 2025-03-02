@@ -28,7 +28,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
   const [uploadComplete, setUploadComplete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagsInputRef = useRef<HTMLInputElement>(null);
-  const [uploadStage, setUploadStage] = useState<'idle' | 'uploading-to-cloudinary' | 'saving-to-supabase' | 'waiting-for-confirmation'>('idle');
 
   // Fetch existing tags when component mounts
   useEffect(() => {
@@ -91,7 +90,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
     // Reset states
     setError(null);
     setUploadProgress(0);
-    setUploadStage('idle');
     setUploadComplete(false);
     setUploadedImageData(null);
 
@@ -117,7 +115,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
 
     // Start upload process
     setIsUploading(true);
-    setUploadStage('uploading-to-cloudinary');
 
     // Create form data for upload
     const formData = new FormData();
@@ -156,8 +153,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
           // Store the uploaded image data and wait for user confirmation
           setUploadedImageData(cloudinaryResponse);
           setUploadComplete(true);
-          setUploadStage('waiting-for-confirmation');
-          setIsUploading(false);
           
           // Focus on the tags input to encourage adding tags
           setTimeout(() => {
@@ -177,7 +172,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
           console.error('Upload failed:', xhr.responseText);
           setError(`Cloudinary error: ${errorMsg}`);
           setIsUploading(false);
-          setUploadStage('idle');
         }
       };
       
@@ -186,7 +180,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
         console.error('Network error during upload');
         setError('Network error. Please check your internet connection and try again.');
         setIsUploading(false);
-        setUploadStage('idle');
       };
       
       // Send the request
@@ -195,7 +188,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
       console.error('Error during upload:', err);
       setError('An unexpected error occurred. Please try again.');
       setIsUploading(false);
-      setUploadStage('idle');
     }
   };
 
@@ -221,7 +213,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
     setPreviewUrl(null);
     setError(null);
     setTags('');
-    setUploadStage('idle');
     setUploadComplete(false);
     setUploadedImageData(null);
     if (fileInputRef.current) {
@@ -263,7 +254,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
     if (!uploadedImageData) return;
     
     setIsUploading(true);
-    setUploadStage('saving-to-supabase');
     
     try {
       // Ensure we're authenticated before saving to Supabase
@@ -289,7 +279,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
         console.error('Error saving to Supabase:', error);
         setError(`Database error: ${error.message}`);
         setIsUploading(false);
-        setUploadStage('waiting-for-confirmation');
         return;
       }
       
@@ -297,7 +286,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
       setPreviewUrl(null);
       setUploadProgress(0);
       setTags('');
-      setUploadStage('idle');
       setUploadComplete(false);
       setUploadedImageData(null);
       if (fileInputRef.current) {
@@ -314,7 +302,6 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
       console.error('Error saving to Supabase:', err);
       setError('Failed to save image metadata to database.');
       setIsUploading(false);
-      setUploadStage('waiting-for-confirmation');
     }
   };
 
@@ -445,9 +432,7 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
             ></div>
           </div>
           <p className="text-sm text-gray-400 text-center">
-            {uploadStage === 'uploading-to-cloudinary' 
-              ? `Uploading to Cloudinary... ${uploadProgress}%` 
-              : 'Saving to database...'}
+            Uploading to Cloudinary... {uploadProgress}%
           </p>
         </div>
       )}
