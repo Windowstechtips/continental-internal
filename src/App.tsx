@@ -7,6 +7,8 @@ import News from './components/News';
 import PresentationView from './components/PresentationView';
 import SiteEditor from './components/SiteEditor';
 import Store from './components/Store/Store';
+import Images from './components/Images';
+import MainGallery from './components/MainGallery';
 
 export default function App() {
   // Check if user is authenticated
@@ -36,6 +38,7 @@ export default function App() {
           <Route path="edit-schedules" element={<EditSchedules />} />
           <Route path="news" element={<News />} />
           <Route path="site-editor" element={<SiteEditor />} />
+          <Route path="images/*" element={<Images />} />
           <Route path="store/*" element={<Store />} />
         </Route>
 
