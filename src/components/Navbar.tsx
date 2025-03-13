@@ -14,6 +14,7 @@ export default function Navbar() {
     { name: 'Site Editor', href: 'site-editor' },
     { name: 'Images', href: 'images' },
     { name: 'Store', href: 'store' },
+    { name: 'Auth', href: 'auth' },
   ];
 
   // Add scroll effect

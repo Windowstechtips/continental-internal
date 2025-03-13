@@ -29,6 +29,13 @@ export default function Login() {
     }, 500);
   };
 
+  const handleTeacherSchedule = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      window.location.href = '/teacher-login';
+    }, 500);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#0a0a0a]">
       {/* Enhanced background decorative elements */}
@@ -120,6 +127,22 @@ export default function Login() {
                   </div>
                 ) : (
                   'Presentation View'
+                )}
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleTeacherSchedule}
+                disabled={isLoading}
+                className="w-full px-4 py-3 bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 font-medium border border-gray-700 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500/50 disabled:opacity-70"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Loading...
+                  </div>
+                ) : (
+                  'Teacher Schedule'
                 )}
               </button>
             </div>

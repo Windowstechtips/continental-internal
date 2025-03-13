@@ -8,24 +8,38 @@ import PresentationView from './components/PresentationView';
 import SiteEditor from './components/SiteEditor';
 import Store from './components/Store/Store';
 import Images from './components/Images';
+import TeacherSchedule from './components/TeacherSchedule';
+import TeacherLogin from './components/TeacherLogin';
+import Auth from './components/Auth';
 
 export default function App() {
   // Check if user is authenticated
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const isTeacherAuthenticated = localStorage.getItem('isTeacherAuthenticated') === 'true';
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public route */}
+        {/* Public routes */}
         <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} 
+        />
+        
+        <Route 
+          path="/teacher-login" 
+          element={isTeacherAuthenticated ? <Navigate to="/teacher-schedule" /> : <TeacherLogin />} 
         />
 
         {/* Protected routes */}
         <Route 
           path="/presentation" 
           element={isAuthenticated ? <PresentationView /> : <Navigate to="/login" />} 
+        />
+
+        <Route 
+          path="/teacher-schedule" 
+          element={isTeacherAuthenticated ? <TeacherSchedule /> : <Navigate to="/teacher-login" />} 
         />
 
         <Route
@@ -39,6 +53,7 @@ export default function App() {
           <Route path="site-editor" element={<SiteEditor />} />
           <Route path="images/*" element={<Images />} />
           <Route path="store/*" element={<Store />} />
+          <Route path="auth" element={<Auth />} />
         </Route>
 
         {/* Redirect all other routes */}
