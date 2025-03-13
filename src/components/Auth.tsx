@@ -259,6 +259,8 @@ export default function Auth() {
       setLoading(true);
       setError(null);
       
+      console.log('Attempting to link teacher with user ID:', selectedUserId);
+      
       // First, verify that the user exists in teacher_users table
       const { data: userData, error: userError } = await supabase
         .from('teacher_users')
@@ -266,15 +268,26 @@ export default function Auth() {
         .eq('id', selectedUserId)
         .single();
         
-      if (userError || !userData) {
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        throw new Error(`Error fetching user: ${userError.message}`);
+      }
+      
+      if (!userData) {
+        console.error('User not found:', selectedUserId);
         throw new Error('User not found in teacher_users table');
       }
+      
+      console.log('Found user:', userData);
       
       // Get the selected teacher group
       const teacherGroup = teacherGroups.find(group => group.name === selectedLinkTeacherName);
       if (!teacherGroup) {
+        console.error('Teacher group not found:', selectedLinkTeacherName);
         throw new Error('Selected teacher not found');
       }
+      
+      console.log('Found teacher group:', teacherGroup);
       
       // First, unlink the user from any existing teachers
       const { error: unlinkError } = await supabase
@@ -282,15 +295,21 @@ export default function Auth() {
         .update({ user_id: null })
         .eq('user_id', selectedUserId);
         
-      if (unlinkError) throw unlinkError;
+      if (unlinkError) {
+        console.error('Error unlinking:', unlinkError);
+        throw new Error(`Error unlinking: ${unlinkError.message}`);
+      }
       
       // Then link to all teachers with the selected name
       const { error: linkError } = await supabase
         .from('teachers')
-        .update({ user_id: selectedUserId })
+        .update({ user_id: userData.id }) // Use the verified user ID
         .in('id', teacherGroup.ids);
           
-      if (linkError) throw linkError;
+      if (linkError) {
+        console.error('Error linking:', linkError);
+        throw new Error(`Error linking: ${linkError.message}`);
+      }
       
       // Close modal and refresh data
       setIsLinkModalOpen(false);
@@ -311,14 +330,6 @@ export default function Auth() {
   // Get available teacher groups (not linked to any user)
   const getAvailableTeacherGroups = () => {
     return teacherGroups.filter(group => !group.hasLinkedUser || group.user_id === selectedUserId);
-  };
-  
-  // Get teacher display with subjects
-  const getTeacherDisplay = (teacherName: string) => {
-    const group = teacherGroups.find(g => g.name === teacherName);
-    if (!group) return '';
-    
-    return `${group.name} - ${group.subjects.join(', ')}`;
   };
   
   // Get teacher display for a user

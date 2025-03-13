@@ -41,10 +41,8 @@ interface NewSchedule {
 }
 
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 7); // 7 AM to 12 AM (midnight)
-const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const GRADES = ['Grade 9', 'Grade 10'];
 const CURRICULUMS = ['Edexcel', 'Cambridge'];
-const SUBJECTS = ['Math', 'Science', 'English', 'History', 'Art', 'Music', 'Physical Education', 'Computer Science'];
 
 export default function TeacherSchedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -441,8 +439,6 @@ export default function TeacherSchedule() {
       setLoading(true);
       
       const teacherIds = teachersList.map(t => t.id);
-      const startOfWeekDate = startOfWeek(currentDate, { weekStartsOn: 1 });
-      const formattedDate = format(startOfWeekDate, 'yyyy-MM-dd');
       
       // Fetch schedules for all teachers with the same name
       const { data: schedulesData, error: schedulesError } = await supabase

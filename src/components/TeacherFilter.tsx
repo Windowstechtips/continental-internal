@@ -69,7 +69,7 @@ export default function TeacherFilter({ teachers, selectedTeacher, onSelect, sho
         </Menu.Button>
       </div>
 
-      <Transition
+      <Transition.Child
         as={Fragment}
         enter="transition ease-out duration-100"
         enterFrom="transform opacity-0 scale-95"
@@ -82,7 +82,7 @@ export default function TeacherFilter({ teachers, selectedTeacher, onSelect, sho
           <div className="py-1">
             {showAllOption && (
               <Menu.Item>
-                {({ active }) => (
+                {({ active }: { active: boolean }) => (
                   <button
                     onClick={() => onSelect(null)}
                     className={`${
@@ -96,7 +96,7 @@ export default function TeacherFilter({ teachers, selectedTeacher, onSelect, sho
             )}
             {groupedTeachers.map((teacher) => (
               <Menu.Item key={teacher.name}>
-                {({ active }) => (
+                {({ active }: { active: boolean }) => (
                   <button
                     onClick={() => handleSelect(teacher)}
                     className={`${
@@ -115,7 +115,7 @@ export default function TeacherFilter({ teachers, selectedTeacher, onSelect, sho
             ))}
           </div>
         </Menu.Items>
-      </Transition>
+      </Transition.Child>
     </Menu>
   );
 } 

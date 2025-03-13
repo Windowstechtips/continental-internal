@@ -43,6 +43,30 @@ declare module '@headlessui/react' {
     children?: ReactNode;
   }
 
+  export interface MenuProps {
+    as?: React.ElementType;
+    className?: string;
+    children?: ReactNode;
+  }
+
+  export interface MenuButtonProps {
+    as?: React.ElementType;
+    className?: string;
+    children?: ReactNode;
+  }
+
+  export interface MenuItemsProps {
+    as?: React.ElementType;
+    className?: string;
+    children?: ReactNode;
+  }
+
+  export interface MenuItemProps {
+    as?: React.ElementType;
+    className?: string;
+    children?: ReactNode | ((props: { active: boolean }) => ReactNode);
+  }
+
   export const Dialog: ComponentType<DialogProps> & {
     Title: ComponentType<DialogTitleProps>;
     Description: ComponentType<any>;
@@ -52,5 +76,11 @@ declare module '@headlessui/react' {
 
   export const Transition: ComponentType<TransitionProps> & {
     Child: ComponentType<TransitionChildProps>;
+  };
+
+  export const Menu: ComponentType<MenuProps> & {
+    Button: ComponentType<MenuButtonProps>;
+    Items: ComponentType<MenuItemsProps>;
+    Item: ComponentType<MenuItemProps>;
   };
 } 
