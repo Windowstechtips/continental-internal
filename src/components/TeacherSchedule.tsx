@@ -116,7 +116,6 @@ export default function TeacherSchedule() {
         } else {
           // Otherwise, just fetch schedules for the selected teacher
           const startOfWeekDate = startOfWeek(currentDate, { weekStartsOn: 1 });
-          const formattedDate = format(startOfWeekDate, 'yyyy-MM-dd');
 
           // Simplified query to avoid OR filter issues
           const { data: schedulesData, error: schedulesError } = await supabase
@@ -124,7 +123,7 @@ export default function TeacherSchedule() {
             .select('*, teachers(*)')
             .eq('teacher_id', selectedTeacher.id)
             .order('start_time');
-
+          
           if (schedulesError) throw schedulesError;
           setSchedules(schedulesData || []);
         }
@@ -132,8 +131,8 @@ export default function TeacherSchedule() {
 
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching data:', error);
-      setError('Failed to load data. Please try again.');
+      console.error('Error fetching schedules:', error);
+      setError('Failed to load schedules. Please try again.');
       setLoading(false);
     }
   }
@@ -361,56 +360,37 @@ export default function TeacherSchedule() {
     window.location.href = '/dashboard';
   };
   
-  // Handle teacher logout
-  const handleLogout = () => {
-    localStorage.removeItem('isTeacherAuthenticated');
-    localStorage.removeItem('teacherId');
-    localStorage.removeItem('teacherName');
-    window.location.href = '/teacher-login';
-  };
-  
   // Get teacher info from localStorage
-  const teacherName = localStorage.getItem('teacherName') || 'Teacher';
   const teacherId = localStorage.getItem('teacherId');
   
   // Group teachers by name for display
   const [teacherGroups, setTeacherGroups] = useState<{ 
-    name: string; 
-    subjects: string[]; 
-    ids: number[]; 
-    teachers: Teacher[] 
+    name: string;
+    ids: number[];
   }[]>([]);
   
   // Group teachers by name
   useEffect(() => {
     const groups: { 
-      name: string; 
-      subjects: string[]; 
-      ids: number[]; 
-      teachers: Teacher[] 
+      name: string;
+      ids: number[];
     }[] = [];
     
     const nameMap: { [key: string]: { 
-      name: string; 
-      subjects: string[]; 
-      ids: number[]; 
-      teachers: Teacher[] 
+      name: string;
+      ids: number[];
     } } = {};
     
     teachers.forEach(teacher => {
       if (!nameMap[teacher.name]) {
         nameMap[teacher.name] = {
           name: teacher.name,
-          subjects: [],
           ids: [],
-          teachers: []
         };
         groups.push(nameMap[teacher.name]);
       }
       
-      nameMap[teacher.name].subjects.push(teacher.subject);
       nameMap[teacher.name].ids.push(teacher.id);
-      nameMap[teacher.name].teachers.push(teacher);
     });
     
     setTeacherGroups(groups);
@@ -422,13 +402,6 @@ export default function TeacherSchedule() {
       const teacher = teachers.find(t => t.id.toString() === teacherId);
       if (teacher) {
         setSelectedTeacher(teacher);
-        
-        // Also select all teachers with the same name
-        const teachersWithSameName = teachers.filter(t => t.name === teacher.name);
-        if (teachersWithSameName.length > 1) {
-          // If there are multiple teachers with the same name, we need to fetch schedules for all of them
-          fetchSchedulesForTeachers(teachersWithSameName);
-        }
       }
     }
   }, [teachers, teacherId]);
@@ -552,8 +525,8 @@ export default function TeacherSchedule() {
               >
                 <option value="" disabled>Select a teacher</option>
                 {teacherGroups.map((group) => (
-                  <option key={group.name} value={group.teachers[0].id}>
-                    {group.name} - {group.subjects.join(', ')}
+                  <option key={group.name} value={group.ids[0]}>
+                    {group.name}
                   </option>
                 ))}
               </select>
