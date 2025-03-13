@@ -115,8 +115,6 @@ export default function TeacherSchedule() {
           await fetchSchedulesForTeachers(teachersWithSameName);
         } else {
           // Otherwise, just fetch schedules for the selected teacher
-          const startOfWeekDate = startOfWeek(currentDate, { weekStartsOn: 1 });
-
           // Simplified query to avoid OR filter issues
           const { data: schedulesData, error: schedulesError } = await supabase
             .from('class_schedules')
