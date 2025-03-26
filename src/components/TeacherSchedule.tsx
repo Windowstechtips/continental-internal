@@ -1,12 +1,18 @@
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { format, startOfWeek, addDays, isSameDay, addWeeks, subWeeks } from 'date-fns';
-import { PlusIcon, ChevronLeftIcon, ChevronRightIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
+import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon, MapPinIcon, AcademicCapIcon, ClockIcon, BookOpenIcon } from '@heroicons/react/24/outline';
 
 interface Teacher {
   id: number;
   name: string;
   subject: string;
+}
+
+interface TeacherWithSubjects {
+  id: number;
+  name: string;
+  subjects: string[];
 }
 
 interface Schedule {
@@ -26,23 +32,7 @@ interface Schedule {
   description: string;
 }
 
-interface NewSchedule {
-  teacher_id: number;
-  day: string;
-  start_time: string;
-  end_time: string;
-  grade: string;
-  curriculum: string;
-  repeats: boolean;
-  date_tag: string;
-  subject: string;
-  description: string;
-  room: string | null;
-}
-
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 7); // 7 AM to 12 AM (midnight)
-const GRADES = ['Grade 9', 'Grade 10'];
-const CURRICULUMS = ['Edexcel', 'Cambridge'];
 
 export default function TeacherSchedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -50,29 +40,37 @@ export default function TeacherSchedule() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [newSchedule, setNewSchedule] = useState<NewSchedule>({
-    teacher_id: 0,
-    day: format(new Date(), 'EEEE'), // e.g., "Monday"
-    start_time: '08:00',
-    end_time: '09:00',
-    grade: 'Grade 9',
-    curriculum: '',
-    repeats: false,
-    date_tag: format(new Date(), 'yyyy-MM-dd'),
-    subject: '',
-    description: '',
-    room: null
-  });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [mobileStartDate, setMobileStartDate] = useState(new Date()); // For mobile view dates
+  const [showAllSchedules, setShowAllSchedules] = useState(false); // State for showing all schedules
 
   // Get the current week's start date (Monday)
   const startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
+
+  // Check if the screen is in mobile view
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    handleResize(); // Initialize on component mount
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Initialize mobile start date to current day
+  useEffect(() => {
+    setMobileStartDate(new Date());
+  }, []);
 
   // Update current time every minute
   useEffect(() => {
@@ -83,10 +81,55 @@ export default function TeacherSchedule() {
     return () => clearInterval(timer);
   }, []);
 
+  // Add background styling effect
+  useEffect(() => {
+    document.body.classList.add('bg-gradient-to-br', 'from-[#0a0a0a]', 'to-[#111827]');
+    
+    return () => {
+      document.body.classList.remove('bg-gradient-to-br', 'from-[#0a0a0a]', 'to-[#111827]');
+    };
+  }, []);
+
+  // Add overflow hidden to body when modal is open
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.classList.add('overflow-hidden');
+    } else {
+      document.body.classList.remove('overflow-hidden');
+    }
+    
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [isModalOpen]);
+
+  // Scroll to current time on initial load and when time changes
+  useEffect(() => {
+    if (!loading && tableRef.current) {
+      const currentTimePos = getCurrentTimePosition();
+      if (currentTimePos) {
+        // Find the current hour row and calculate its position
+        const hourRows = tableRef.current.querySelectorAll('tbody tr');
+        const currentHourRow = hourRows[currentTimePos.rowIndex];
+        
+        if (currentHourRow) {
+          // Calculate position to scroll to (current hour row - some offset to center it)
+          const rowTop = (currentHourRow as HTMLElement).offsetTop;
+          // Get container height to center the time line
+          const containerHeight = tableRef.current.clientHeight;
+          const scrollPosition = rowTop - containerHeight / 2 + 30; // 30px offset to position the line in the middle
+          
+          // Scroll to the calculated position
+          tableRef.current.scrollTop = scrollPosition;
+        }
+      }
+    }
+  }, [loading, currentTime]);
+
   // Fetch teachers and schedules
   useEffect(() => {
     fetchData();
-  }, [currentDate, selectedTeacher]);
+  }, [currentDate, selectedTeacher, showAllSchedules]);
 
   async function fetchData() {
     try {
@@ -101,31 +144,21 @@ export default function TeacherSchedule() {
       setTeachers(teachersData || []);
 
       // If no teacher is selected and we have teachers, select the first one
-      if (!selectedTeacher && teachersData && teachersData.length > 0) {
+      if (!selectedTeacher && teachersData && teachersData.length > 0 && !showAllSchedules) {
         setSelectedTeacher(teachersData[0]);
       }
 
-      // Fetch schedules for the selected teacher
-      if (selectedTeacher) {
-        // Get all teachers with the same name
-        const teachersWithSameName = teachersData.filter(t => t.name === selectedTeacher.name);
-        
-        if (teachersWithSameName.length > 1) {
-          // If there are multiple teachers with the same name, fetch schedules for all of them
-          await fetchSchedulesForTeachers(teachersWithSameName);
-        } else {
-          // Otherwise, just fetch schedules for the selected teacher
-          // Simplified query to avoid OR filter issues
-          const { data: schedulesData, error: schedulesError } = await supabase
-            .from('class_schedules')
-            .select('*, teachers(*)')
-            .eq('teacher_id', selectedTeacher.id)
-            .order('start_time');
-          
-          if (schedulesError) throw schedulesError;
-          setSchedules(schedulesData || []);
-        }
+      // Fetch schedules for the selected teacher or all schedules
+      let query = supabase.from('class_schedules').select('*, teachers(*)');
+      
+      if (selectedTeacher && !showAllSchedules) {
+        query = query.eq('teacher_id', selectedTeacher.id);
       }
+      
+      const { data: schedulesData, error: schedulesError } = await query.order('start_time');
+      
+      if (schedulesError) throw schedulesError;
+      setSchedules(schedulesData || []);
 
       setLoading(false);
     } catch (error) {
@@ -144,11 +177,6 @@ export default function TeacherSchedule() {
     return `${formattedHour}:${minutes} ${ampm}`;
   };
 
-  // Convert hour number to time string (e.g., 9 -> "09:00")
-  const hourToTimeString = (hour: number) => {
-    return `${hour.toString().padStart(2, '0')}:00`;
-  };
-
   // Handle week navigation
   const goToPreviousWeek = () => {
     setCurrentDate(subWeeks(currentDate, 1));
@@ -158,85 +186,13 @@ export default function TeacherSchedule() {
     setCurrentDate(addWeeks(currentDate, 1));
   };
 
-  const goToToday = () => {
-    setCurrentDate(new Date());
+  // Handle mobile day navigation
+  const goToPreviousDay = () => {
+    setMobileStartDate(prevDate => addDays(prevDate, -1));
   };
 
-  // Handle cell click to open add schedule modal
-  const handleCellClick = (day: Date, hour: number) => {
-    setSelectedDay(day);
-    setSelectedHour(hour);
-    
-    if (!selectedTeacher) {
-      setError('Please select a teacher first');
-      return;
-    }
-    
-    // Pre-fill the new schedule form
-    setNewSchedule({
-      ...newSchedule,
-      teacher_id: selectedTeacher.id,
-      day: format(day, 'EEEE'), // e.g., "Monday"
-      date_tag: format(day, 'yyyy-MM-dd'),
-      start_time: hourToTimeString(hour),
-      end_time: hourToTimeString(hour + 1),
-      subject: selectedTeacher.subject // Use the teacher's assigned subject
-    });
-    
-    setIsAddModalOpen(true);
-  };
-
-  // Handle adding a new schedule
-  const handleAddSchedule = async () => {
-    try {
-      if (!selectedTeacher) {
-        setError('Please select a teacher');
-        return;
-      }
-
-      // Validate required fields
-      if (!newSchedule.grade || !newSchedule.start_time || !newSchedule.end_time) {
-        setError('Please fill in all required fields (Grade, Start Time, End Time)');
-        return;
-      }
-
-      // Format the data for insertion
-      const scheduleData = {
-        teacher_id: selectedTeacher.id,
-        day: newSchedule.day,
-        start_time: newSchedule.start_time,
-        end_time: newSchedule.end_time,
-        grade: newSchedule.grade,
-        curriculum: newSchedule.curriculum || '',
-        repeats: newSchedule.repeats,
-        date_tag: newSchedule.date_tag,
-        subject: selectedTeacher.subject, // Always use the teacher's subject
-        description: newSchedule.description || '',
-        room: newSchedule.room || null
-      };
-
-      console.log('Inserting schedule data:', scheduleData);
-
-      // Try inserting without .select() to simplify the query
-      const { error: insertError } = await supabase
-        .from('class_schedules')
-        .insert(scheduleData);
-
-      if (insertError) {
-        console.error('Insert error details:', insertError);
-        setError(`Failed to add schedule: ${insertError.message}`);
-        return;
-      }
-
-      console.log('Schedule added successfully');
-      
-      // Close modal and refresh data
-      setIsAddModalOpen(false);
-      fetchData();
-    } catch (error: any) {
-      console.error('Error adding schedule:', error);
-      setError(`Failed to add schedule: ${error?.message || 'Unknown error'}`);
-    }
+  const goToNextDay = () => {
+    setMobileStartDate(prevDate => addDays(prevDate, 1));
   };
 
   // Check if a schedule falls on a specific day and hour
@@ -245,107 +201,178 @@ export default function TeacherSchedule() {
     const dateString = format(day, 'yyyy-MM-dd');
     
     return schedules.filter(schedule => {
-      // Check if schedule is for this day (either by day of week for repeating or by date)
       const isDayMatch = 
         (schedule.repeats && schedule.day === dayString) || 
         (!schedule.repeats && schedule.date_tag === dateString);
       
-      // Check if schedule is canceled for this date
-      const isCanceled = schedule.canceled_dates?.includes(dateString);
+      if (!isDayMatch) return false;
       
-      if (!isDayMatch || isCanceled) return false;
-      
-      // Check if this hour is the starting hour of the schedule
-      const scheduleStartHour = parseInt(schedule.start_time.split(':')[0], 10);
-      
-      // Only show the schedule at its starting hour
-      return hour === scheduleStartHour;
+      const scheduleStartHour = parseInt(schedule.start_time.split(':')[0]);
+      return scheduleStartHour === hour;
     });
   };
 
-  // Calculate the height of a schedule card based on its duration
+  // Calculate schedule height based on duration
   const calculateScheduleHeight = (startTime: string, endTime: string) => {
-    const startHour = parseInt(startTime.split(':')[0], 10);
-    const startMinute = parseInt(startTime.split(':')[1], 10);
-    const endHour = parseInt(endTime.split(':')[0], 10);
-    const endMinute = parseInt(endTime.split(':')[1], 10);
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
     
-    // Calculate duration in hours, including partial hours
-    let duration = 0;
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    const durationMinutes = endMinutes - startMinutes;
     
-    if (endHour > startHour || (endHour === startHour && endMinute > startMinute)) {
-      // Same day
-      duration = (endHour - startHour) + (endMinute - startMinute) / 60;
-    } else {
-      // Next day (e.g., 23:00 to 01:00)
-      duration = (endHour + 24 - startHour) + (endMinute - startMinute) / 60;
-    }
-    
-    // Each hour cell is 80px tall
-    return `${Math.max(duration * 80 - 2, 78)}px`; // Ensure minimum height and account for borders
+    // Add a small gap between cells (2px)
+    return `calc(${(durationMinutes / 60) * 100}% - 2px)`;
   };
 
-  // Handle schedule card click to show details
-  const handleScheduleClick = (schedule: Schedule, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the cell click
+  // Calculate the position of the current time line
+  const getCurrentTimePosition = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    
+    // Calculate position as percentage of the hour
+    const position = (currentMinutes / 60) * 100;
+    
+    // Find the row index for the current hour
+    let rowIndex = HOURS.findIndex(hour => hour === currentHour);
+    
+    // If current hour is before our schedule range (before 7 AM), show at first row (7 AM)
+    if (currentHour < HOURS[0]) {
+      rowIndex = 0;
+      return {
+        rowIndex,
+        position: 0, // Position at the top of the row
+        formattedTime: format(now, 'h:mm a') // Add formatted current time
+      };
+    }
+    
+    // If current hour is not in our schedule range (after midnight), return null
+    if (rowIndex === -1 && currentHour >= HOURS[HOURS.length - 1] + 1) {
+      return null;
+    }
+    
+    return {
+      rowIndex,
+      position,
+      formattedTime: format(now, 'h:mm a') // Add formatted current time
+    };
+  };
+
+  // Handle card click
+  const handleCardClick = (schedule: Schedule) => {
     setSelectedSchedule(schedule);
-    setIsDetailModalOpen(true);
+    setIsModalOpen(true);
   };
 
-  // Render schedule cell content
-  const renderScheduleCell = (day: Date, hour: number) => {
-    const matchingSchedules = getSchedulesForDayAndHour(day, hour);
-    
-    if (matchingSchedules.length === 0) {
-      return (
-        <div 
-          className="h-full w-full flex items-center justify-center cursor-pointer opacity-0 hover:opacity-100 transition-opacity"
-        >
-          <PlusIcon className="h-5 w-5 text-gray-400" />
-        </div>
-      );
+  // Close modal
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedSchedule(null);
+  };
+
+  // Get day of schedule
+  const getScheduleDay = (schedule: Schedule) => {
+    if (schedule.repeats) {
+      return schedule.day;
+    } else {
+      // Format date_tag as Month day, year
+      const date = new Date(schedule.date_tag);
+      return format(date, 'MMMM d, yyyy');
     }
+  };
+
+  // Render a schedule cell
+  const renderScheduleCell = (day: Date, hour: number) => {
+    const schedules = getSchedulesForDayAndHour(day, hour);
+    const now = new Date();
     
     return (
-      <div className="h-full w-full overflow-visible">
-        {matchingSchedules.map(schedule => {
-          const height = calculateScheduleHeight(schedule.start_time, schedule.end_time);
+      <div className="relative min-h-[60px] bg-gray-800/30">
+        {schedules.map(schedule => {
+          // Check if the schedule has finished (either a past day or finished today)
+          const isPastDay = day < now && !isSameDay(day, now);
+          const isFinishedToday = isSameDay(day, now) && 
+            (now.getHours() > parseInt(schedule.end_time.split(':')[0]) || 
+             (now.getHours() === parseInt(schedule.end_time.split(':')[0]) && 
+              now.getMinutes() >= parseInt(schedule.end_time.split(':')[1])));
+          
+          const isFinished = isPastDay || isFinishedToday;
+          
           return (
-            <div 
+            <div
               key={schedule.id}
-              className="absolute inset-x-1 p-3 rounded bg-blue-500/20 border border-blue-500/30 text-xs cursor-pointer hover:bg-blue-500/30 transition-colors group"
-              style={{ 
-                height: height, 
-                zIndex: 10,
-                overflow: 'hidden', // Remove scrollbar
+              onClick={() => handleCardClick(schedule)}
+              className={`absolute inset-x-1 ${
+                isFinished 
+                  ? 'bg-gray-800/90 border-gray-700/50 hover:bg-gray-700/90' 
+                  : 'bg-gradient-to-br from-blue-600/30 to-indigo-500/20 hover:from-blue-600/40 hover:to-indigo-500/30 border-blue-400/40'
+              } border rounded-md p-2 text-xs ${
+                isFinished ? 'text-gray-400' : 'text-gray-200'
+              } shadow-md transition-all duration-200 overflow-hidden cursor-pointer transform hover:scale-[1.02] hover:z-20`}
+              style={{
+                height: calculateScheduleHeight(schedule.start_time, schedule.end_time),
                 top: '1px',
-                left: '1px',
-                right: '1px',
-                width: 'calc(100% - 2px)'
+                margin: '1px'
               }}
-              onClick={(e) => handleScheduleClick(schedule, e)}
             >
-              <div className="flex justify-between items-start">
-                <div className="font-medium text-sm mb-1">{schedule.subject}</div>
-                <div className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+              {/* Create a colorful accent line at the top of each card */}
+              <div className={`absolute top-0 left-0 right-0 h-1 ${
+                isFinished ? 'bg-gray-600/60' : 'bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400'
+              } rounded-t`}></div>
+              
+              <div className="flex flex-col h-full relative">
+                {/* Decorative circle in background */}
+                {!isFinished && (
+                  <div className="absolute right-0 top-0 w-16 h-16 rounded-full bg-gradient-to-br from-blue-400/10 to-purple-400/5 -mr-8 -mt-8 blur-sm"></div>
+                )}
+                
+                <div>
+                  {/* Subject title with gradient text */}
+                  <div className={`font-bold ${
+                    isFinished 
+                      ? 'text-gray-400' 
+                      : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-sky-200'
+                  } text-sm md:text-lg lg:text-xl mb-1 truncate leading-tight`}>{schedule.subject}</div>
+                  
+                  {/* Grade with badge-like style */}
+                  <div className={`inline-block rounded-full px-2 py-0.5 text-xs md:text-sm font-medium ${
+                    isFinished
+                      ? 'bg-gray-700/60 text-gray-400'
+                      : 'bg-blue-500/20 text-blue-100'
+                  } mb-1`}>{schedule.grade}</div>
+                  
+                  {/* Curriculum with subtle styling */}
+                  <div className={`${
+                    isFinished ? 'text-gray-600' : 'text-gray-400'
+                  } text-xs md:text-sm lg:text-base mt-1 font-light italic`}>{schedule.curriculum}</div>
+                  
+                  {/* Time with eye-catching style */}
+                  <div className={`flex items-center mt-2 ${
+                    isFinished ? 'text-gray-500' : 'text-gray-300'
+                  } text-xs md:text-sm lg:text-base font-medium`}>
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className={`${isFinished ? '' : 'tracking-wide'}`}>
+                      {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
+                    </span>
+                  </div>
                 </div>
+                
+                {schedule.room && (
+                  <div className={`flex items-center mt-2 ${
+                    isFinished ? 'text-gray-600' : 'text-gray-400'
+                  } text-xs md:text-sm`}>
+                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${
+                      isFinished ? 'bg-gray-700' : 'bg-blue-500/30'
+                    } mr-1`}>
+                      <span className="text-[8px]">R</span>
+                    </span>
+                    <span>{schedule.room}</span>
+                  </div>
+                )}
               </div>
-              <div className="text-xs text-gray-300 mb-1">{schedule.teachers?.name || 'Unknown Teacher'}</div>
-              <div className="text-xs mb-1">
-                <span className="text-gray-200">{schedule.grade}</span>
-                {schedule.room && <span className="text-gray-400"> - Room {schedule.room}</span>}
-              </div>
-              <div className="text-gray-300 text-xs">
-                {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
-              </div>
-              {schedule.description && (
-                <div className="mt-2 text-gray-400 text-xs line-clamp-2">
-                  {schedule.description}
-                </div>
-              )}
             </div>
           );
         })}
@@ -353,567 +380,381 @@ export default function TeacherSchedule() {
     );
   };
 
-  // Go back to dashboard
-  const handleBackToDashboard = () => {
-    window.location.href = '/dashboard';
-  };
-  
-  // Get teacher info from localStorage
-  const teacherId = localStorage.getItem('teacherId');
-  
-  // Group teachers by name for display
-  const [teacherGroups, setTeacherGroups] = useState<{ 
-    name: string;
-    ids: number[];
-  }[]>([]);
-  
-  // Group teachers by name
-  useEffect(() => {
-    const groups: { 
-      name: string;
-      ids: number[];
-    }[] = [];
-    
-    const nameMap: { [key: string]: { 
-      name: string;
-      ids: number[];
-    } } = {};
-    
-    teachers.forEach(teacher => {
-      if (!nameMap[teacher.name]) {
-        nameMap[teacher.name] = {
-          name: teacher.name,
-          ids: [],
-        };
-        groups.push(nameMap[teacher.name]);
+  // Group teachers by name and collect their subjects
+  const teachersWithSubjects = teachers.reduce((acc: TeacherWithSubjects[], teacher) => {
+    const existingTeacher = acc.find(t => t.name === teacher.name);
+    if (existingTeacher) {
+      if (!existingTeacher.subjects.includes(teacher.subject)) {
+        existingTeacher.subjects.push(teacher.subject);
       }
-      
-      nameMap[teacher.name].ids.push(teacher.id);
-    });
-    
-    setTeacherGroups(groups);
-  }, [teachers]);
-  
-  // If teacherId is available, use it to filter schedules for this specific teacher
-  useEffect(() => {
-    if (teacherId) {
-      const teacher = teachers.find(t => t.id.toString() === teacherId);
-      if (teacher) {
-        setSelectedTeacher(teacher);
-      }
+    } else {
+      acc.push({
+        id: teacher.id,
+        name: teacher.name,
+        subjects: [teacher.subject]
+      });
     }
-  }, [teachers, teacherId]);
-  
-  // Fetch schedules for multiple teachers with the same name
-  const fetchSchedulesForTeachers = async (teachersList: Teacher[]) => {
-    try {
-      setLoading(true);
-      
-      const teacherIds = teachersList.map(t => t.id);
-      
-      // Fetch schedules for all teachers with the same name
-      const { data: schedulesData, error: schedulesError } = await supabase
-        .from('class_schedules')
-        .select('*, teachers(*)')
-        .in('teacher_id', teacherIds)
-        .order('start_time');
-      
-      if (schedulesError) throw schedulesError;
-      setSchedules(schedulesData || []);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching schedules for multiple teachers:', error);
-      setError('Failed to load schedules. Please try again.');
-      setLoading(false);
+    return acc;
+  }, []);
+
+  // Get the selected teacher's subjects
+  const selectedTeacherSubjects = selectedTeacher 
+    ? teachersWithSubjects.find(t => t.name === selectedTeacher.name)?.subjects || []
+    : [];
+
+  // Handle teacher selection
+  const handleTeacherSelect = (teacherId: string) => {
+    if (showAllSchedules) {
+      setShowAllSchedules(false);
+    }
+    
+    const teacher = teachers.find(t => t.id === parseInt(teacherId));
+    if (teacher) {
+      setSelectedTeacher(teacher);
+      // Reset subject selection when teacher changes
+      setSelectedSubject(null);
     }
   };
 
-  // Calculate the position of the current time line
-  const calculateTimeLinePosition = () => {
-    const now = currentTime;
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    
-    // Calculate position as percentage of the day (24 hours)
-    // But we only show from 7 AM to 12 AM (midnight) (18 hours)
-    // So we need to adjust the calculation
-    
-    // First, check if current time is within our displayed hours
-    if (hours < 7 || hours >= 24) {
-      return null; // Don't show the line if outside displayed hours
-    }
-    
-    // Calculate how many hours and minutes have passed since 7 AM
-    const hoursSince7AM = hours - 7;
-    const minutePercentage = minutes / 60;
-    
-    // Each hour cell is 80px tall
-    return (hoursSince7AM + minutePercentage) * 80;
+  // Handle "Show All" button click
+  const handleShowAllClick = () => {
+    setShowAllSchedules(true);
+    setSelectedTeacher(null);
+    setSelectedSubject(null);
   };
-  
-  // Reference to the calendar container for scrolling
-  const calendarRef = React.useRef<HTMLDivElement>(null);
-  
-  // Scroll to current time when component mounts or time changes
-  useEffect(() => {
-    const scrollToCurrentTime = () => {
-      const timeLinePosition = calculateTimeLinePosition();
-      
-      if (timeLinePosition !== null && calendarRef.current) {
-        // Scroll to the time line position with some offset to center it
-        const offset = window.innerHeight / 3; // Show 1/3 of the screen above the current time
-        calendarRef.current.scrollTop = Math.max(0, timeLinePosition - offset);
-      }
-    };
-    
-    // Scroll on mount and when time changes
-    scrollToCurrentTime();
-    
-    // Also scroll when the component is fully loaded
-    if (!loading) {
-      setTimeout(scrollToCurrentTime, 500);
+
+  // Handle subject selection
+  const handleSubjectSelect = (subject: string) => {
+    setSelectedSubject(subject);
+    // Update selected teacher with the chosen subject
+    const teacher = teachers.find(t => t.name === selectedTeacher?.name && t.subject === subject);
+    if (teacher) {
+      setSelectedTeacher(teacher);
     }
-  }, [currentTime, loading]);
-  
-  // Check if the current day is visible in the current week view
-  const isCurrentDayVisible = () => {
-    const today = new Date();
-    const endDate = addDays(startDate, 6);
-    return today >= startDate && today <= endDate;
   };
 
   return (
-    <div className="min-h-screen text-gray-200 flex flex-col">
-      {/* Fixed background gradient that covers the entire page */}
-      <div className="fixed inset-0 bg-gradient-to-br from-[#0a0a0a] to-[#111827] -z-10"></div>
-      
-      {/* Subtle pattern overlay */}
-      <div className="fixed inset-0 bg-noise opacity-[0.03] mix-blend-overlay -z-10"></div>
-      
-      <div className="max-w-7xl mx-auto px-4 py-8 w-full flex-1 flex flex-col relative z-0" style={{ minHeight: '100vh' }}>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={handleBackToDashboard}
-              className="flex items-center text-gray-400 hover:text-white transition-colors"
-            >
-              <ArrowLeftIcon className="h-5 w-5 mr-1" />
-              Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
-              Teacher Schedule
-            </h1>
+    <div className="min-h-screen w-full">
+      {/* Simplified background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Primary gradient mesh - larger, more diffused gradients */}
+        <div className="absolute -top-[10%] right-[5%] w-[80vw] h-[70vh] bg-gradient-to-bl from-blue-600/8 via-blue-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
+        <div className="absolute -bottom-[10%] left-[5%] w-[80vw] h-[70vh] bg-gradient-to-tr from-blue-500/8 via-sky-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
+      </div>
+
+      <div className="relative z-10 p-4 md:p-6 flex flex-col h-[calc(100vh-2rem)]">
+        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+          <div className="flex flex-col md:flex-row md:items-center md:space-x-6 space-y-4 md:space-y-0">
+            <h1 className="text-2xl md:text-3xl font-bold text-white">Teacher Schedule</h1>
           </div>
-          
-          <div className="flex items-center space-x-4">
-            <div className="flex flex-col">
-              <label htmlFor="teacher-select" className="block text-sm font-medium text-gray-400 mb-1">
-                Select Teacher
-              </label>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+            <div className="flex flex-wrap gap-4 items-center w-full">
               <select
-                id="teacher-select"
-                value={selectedTeacher?.id || ''}
+                value={selectedTeacher?.id || (showAllSchedules ? 'all' : '')}
                 onChange={(e) => {
-                  const teacherId = parseInt(e.target.value);
-                  const teacher = teachers.find(t => t.id === teacherId) || null;
-                  setSelectedTeacher(teacher);
+                  if (e.target.value === 'all') {
+                    handleShowAllClick();
+                  } else {
+                    handleTeacherSelect(e.target.value);
+                  }
                 }}
-                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="bg-gray-800 border border-gray-700/50 rounded-lg p-2.5 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto sm:min-w-[220px] appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNy40MDYgOC4wMDAwMUwxMiAxMi41OTRMMTYuNTk0IDguMDAwMDFMMTggOS40MDYwMUwxMiAxNS40MDZMNiA5LjQwNjAxTDcuNDA2IDguMDAwMDFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=')] bg-[position:right_10px_center] bg-no-repeat pr-10"
               >
-                <option value="" disabled>Select a teacher</option>
-                {teacherGroups.map((group) => (
-                  <option key={group.name} value={group.ids[0]}>
-                    {group.name}
+                <option value="">Select a teacher</option>
+                <option value="all">All Teachers</option>
+                {teachersWithSubjects.map(teacher => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.name}
                   </option>
                 ))}
               </select>
+              
+              {selectedTeacher && selectedTeacherSubjects.length > 1 && (
+                <select
+                  value={selectedSubject || ''}
+                  onChange={(e) => handleSubjectSelect(e.target.value)}
+                  className="bg-gray-800 border border-gray-700/50 rounded-lg p-2.5 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto sm:min-w-[180px] appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNy40MDYgOC4wMDAwMUwxMiAxMi41OTRMMTYuNTk0IDguMDAwMDFMMTggOS40MDYwMUwxMiAxNS40MDZMNiA5LjQwNjAxTDcuNDA2IDguMDAwMDFaIiBmaWxsPSJjdXJyZW50Q29sb3IiLz48L3N2Zz4=')] bg-[position:right_10px_center] bg-no-repeat pr-10"
+                >
+                  <option value="">Select subject</option>
+                  {selectedTeacherSubjects.map(subject => (
+                    <option key={subject} value={subject}>
+                      {subject}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
-        
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+
+        {error && (
+          <div className="bg-red-900/20 border border-red-800/50 text-red-300 px-4 py-3 rounded-lg mb-4">
+            {error}
+          </div>
+        )}
+
+        <div className="flex-1 overflow-hidden rounded-xl border border-gray-700/50 bg-gray-800/40 backdrop-blur-md shadow-2xl flex flex-col">
+          {/* Date Navigation Bar */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50 bg-gray-800/60">
             <button
-              onClick={goToPreviousWeek}
-              className="p-2 rounded-full hover:bg-gray-800 transition-colors"
+              onClick={isMobileView ? goToPreviousDay : goToPreviousWeek}
+              className="p-1.5 hover:bg-gray-700/50 rounded-full text-gray-300 hover:text-white transition-colors"
+              aria-label="Previous"
             >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
             
-            <button
-              onClick={goToToday}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              Today
-            </button>
+            <div className="font-semibold text-gray-200">
+              {isMobileView 
+                ? `${format(mobileStartDate, 'MMM d')} - ${format(addDays(mobileStartDate, 1), 'MMM d, yyyy')}`
+                : `${format(startDate, 'MMM d')} - ${format(addDays(startDate, 6), 'MMM d, yyyy')}`
+              }
+            </div>
             
             <button
-              onClick={goToNextWeek}
-              className="p-2 rounded-full hover:bg-gray-800 transition-colors"
+              onClick={isMobileView ? goToNextDay : goToNextWeek}
+              className="p-1.5 hover:bg-gray-700/50 rounded-full text-gray-300 hover:text-white transition-colors"
+              aria-label="Next"
             >
               <ChevronRightIcon className="h-5 w-5" />
             </button>
-            
-            <h2 className="text-xl font-semibold">
-              {format(startDate, 'MMMM d')} - {format(addDays(startDate, 6), 'MMMM d, yyyy')}
-            </h2>
           </div>
           
-          {isCurrentDayVisible() && (
-            <button
-              onClick={() => {
-                const timeLinePosition = calculateTimeLinePosition();
-                if (timeLinePosition !== null && calendarRef.current) {
-                  const offset = window.innerHeight / 3;
-                  calendarRef.current.scrollTop = Math.max(0, timeLinePosition - offset);
-                }
-              }}
-              className="px-3 py-1.5 bg-red-500/20 text-red-300 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors text-sm flex items-center"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Current Time
-            </button>
-          )}
+          <div ref={tableRef} className="overflow-y-auto overflow-x-auto h-full custom-scrollbar">
+            <table className="w-full border-collapse">
+              <thead className="sticky top-0 z-20">
+                <tr>
+                  <th className="border-r border-b border-gray-700 p-3 text-gray-300 bg-gray-800 rounded-tl-xl sticky left-0 z-20">
+                    <div className="font-medium text-gray-400 text-xs">Time</div>
+                  </th>
+                  {isMobileView ? (
+                    // Mobile view: show current day and next day
+                    Array.from({ length: 2 }, (_, i) => {
+                      const date = addDays(mobileStartDate, i);
+                      const isToday = isSameDay(date, new Date());
+                      return (
+                        <th key={i} className={`border border-gray-700 p-3 ${isToday ? 'bg-blue-900' : 'bg-gray-800'}`}>
+                          <div className={`font-bold text-base ${isToday ? 'text-blue-300' : 'text-gray-200'}`}>{format(date, 'EEE')}</div>
+                          <div className="text-sm text-gray-400">{format(date, 'MMM d')}</div>
+                        </th>
+                      );
+                    })
+                  ) : (
+                    // Desktop view: show full week
+                    Array.from({ length: 7 }, (_, i) => {
+                      const date = addDays(startDate, i);
+                      const isToday = isSameDay(date, new Date());
+                      return (
+                        <th key={i} className={`border border-gray-700 p-3 ${isToday ? 'bg-blue-900' : 'bg-gray-800'}`}>
+                          <div className={`font-bold text-base ${isToday ? 'text-blue-300' : 'text-gray-200'}`}>{format(date, 'EEE')}</div>
+                          <div className="text-sm text-gray-400">{format(date, 'MMM d')}</div>
+                        </th>
+                      );
+                    })
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {HOURS.map((hour, rowIndex) => {
+                  const currentTimePos = getCurrentTimePosition();
+                  const isCurrentHour = currentTimePos?.rowIndex === rowIndex;
+                  const isLastRow = rowIndex === HOURS.length - 1;
+                  
+                  return (
+                    <tr key={hour} className="relative group transition-colors hover:bg-gray-800/20" id={isCurrentHour ? 'current-hour-row' : undefined}>
+                      <td className={`border-r border-b border-gray-700 p-2 text-sm text-gray-300 bg-gray-800 sticky left-0 z-10 ${isLastRow ? 'rounded-bl-xl' : ''}`}>
+                        <div className="font-medium">
+                          {format(new Date().setHours(hour), 'h a')}
+                        </div>
+                      </td>
+                      {isMobileView ? (
+                        // Mobile view: current day and next day cells
+                        Array.from({ length: 2 }, (_, i) => {
+                          const date = addDays(mobileStartDate, i);
+                          const isToday = isSameDay(date, new Date());
+                          
+                          return (
+                            <td 
+                              key={i} 
+                              className={`border border-gray-700 p-0 ${isToday ? 'bg-blue-900/10' : ''}`}
+                            >
+                              {renderScheduleCell(date, hour)}
+                            </td>
+                          );
+                        })
+                      ) : (
+                        // Desktop view: full week cells
+                        Array.from({ length: 7 }, (_, i) => {
+                          const date = addDays(startDate, i);
+                          const isToday = isSameDay(date, new Date());
+                          
+                          return (
+                            <td 
+                              key={i} 
+                              className={`border border-gray-700 p-0 ${isToday ? 'bg-blue-900/10' : ''}`}
+                            >
+                              {renderScheduleCell(date, hour)}
+                            </td>
+                          );
+                        })
+                      )}
+                      {isCurrentHour && (
+                        <>
+                          {/* Current time line with tab */}
+                          <div className="absolute left-0 right-0 flex items-center z-30">
+                            {/* Horizontal time line */}
+                            <div 
+                              className="absolute left-0 right-0 h-0.5 bg-red-500"
+                              style={{
+                                top: `${currentTimePos.position}%`
+                              }}
+                            >
+                              {/* Time indicator tab placed at the right edge */}
+                              <div 
+                                className="absolute bg-red-500 px-2 py-1 rounded text-white text-xs font-medium min-w-[72px] text-center whitespace-nowrap flex items-center justify-center"
+                                style={{
+                                  top: '0',
+                                  right: '8px',
+                                  transform: 'translateY(-50%)'
+                                }}
+                              >
+                                <div className="absolute left-[-4px] top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rotate-45"></div>
+                                {currentTimePos.formattedTime}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-        
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : error ? (
-          <div className="bg-red-900/20 border border-red-800 rounded-lg p-4 text-red-300">
-            {error}
-          </div>
-        ) : (
-          <div className="bg-gray-900/20 border border-gray-800 rounded-xl overflow-hidden flex-1 flex flex-col backdrop-blur-sm">
-            {/* Calendar header - days of the week */}
-            <div className="grid grid-cols-8 border-b border-gray-800 sticky top-0 bg-gray-900/90 backdrop-blur-sm z-20">
-              <div className="p-3 text-center text-gray-500 border-r border-gray-800">
-                Hour
-              </div>
-              {Array.from({ length: 7 }, (_, i) => {
-                const day = addDays(startDate, i);
-                return (
-                  <div 
-                    key={i} 
-                    className={`p-3 text-center font-medium ${
-                      isSameDay(day, new Date()) ? 'bg-blue-900/20 text-blue-300' : ''
-                    }`}
-                  >
-                    <div>{format(day, 'EEE')}</div>
-                    <div className="text-xl">{format(day, 'd')}</div>
-                  </div>
-                );
-              })}
+
+        {loading && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-gray-800 p-6 rounded-xl border border-gray-700/50 text-gray-200 shadow-2xl flex flex-col items-center">
+              <div className="w-10 h-10 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+              <div className="text-lg font-medium">Loading schedule...</div>
             </div>
-            
-            {/* Calendar body - hours and schedule cells */}
+          </div>
+        )}
+
+        {/* Schedule Detail Modal */}
+        {isModalOpen && selectedSchedule && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeModal}>
             <div 
-              className="grid grid-cols-8 flex-1 overflow-y-auto relative custom-scrollbar" 
-              ref={calendarRef}
-              style={{
-                minHeight: '500px'
-              }}
+              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
             >
-              {/* Current time line */}
-              {isSameDay(currentTime, new Date()) && calculateTimeLinePosition() !== null && (
-                <div 
-                  className="absolute left-0 right-0 border-t-2 border-red-500 z-30 flex items-center pointer-events-none"
-                  style={{ 
-                    top: `${calculateTimeLinePosition()}px`,
-                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.6), 0 0 4px rgba(239, 68, 68, 0.8)'
-                  }}
-                >
-                  <div className="bg-red-500 text-white text-xs px-2 py-1 rounded-r-sm shadow-lg flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-white mr-1 animate-pulse"></div>
-                    {format(currentTime, 'h:mm a')}
-                  </div>
-                  <div className="absolute right-0 w-2 h-2 rounded-full bg-red-500 shadow-lg"></div>
+              {/* Modal Header with Accent Gradient */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
+                <div className="relative p-5 flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-white">{selectedSchedule.subject}</h3>
+                  <button 
+                    onClick={closeModal}
+                    className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
                 </div>
-              )}
+              </div>
               
-              {HOURS.map(hour => (
-                <Fragment key={hour}>
-                  {/* Hour label */}
-                  <div className="p-2 text-center text-sm text-gray-500 border-r border-gray-800 border-b border-gray-800 h-20 flex items-center justify-center sticky left-0 bg-gray-900/90 backdrop-blur-sm">
-                    {hour === 0 ? '12 AM' : 
-                     hour === 12 ? '12 PM' : 
-                     hour === 24 ? '12 AM' : 
-                     hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
+              {/* Modal Content */}
+              <div className="p-5 space-y-5">
+                {/* Main info grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-start space-x-3">
+                    <ClockIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Time</p>
+                      <p className="text-white text-base">
+                        {formatTime(selectedSchedule.start_time)} - {formatTime(selectedSchedule.end_time)}
+                      </p>
+                      <p className="text-gray-500 text-xs mt-1">
+                        {selectedSchedule.repeats ? 'Weekly' : 'One-time'}
+                      </p>
+                    </div>
                   </div>
                   
-                  {/* Schedule cells for each day */}
-                  {Array.from({ length: 7 }, (_, i) => {
-                    const day = addDays(startDate, i);
-                    return (
-                      <div 
-                        key={i} 
-                        className={`h-20 p-0 border-b border-gray-800 ${
-                          i < 6 ? 'border-r border-gray-800' : ''
-                        } ${
-                          isSameDay(day, new Date()) ? 'bg-blue-900/10' : 'bg-transparent'
-                        } relative`}
-                        onClick={() => handleCellClick(day, hour)}
-                      >
-                        {renderScheduleCell(day, hour)}
+                  <div className="flex items-start space-x-3">
+                    <AcademicCapIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Class</p>
+                      <p className="text-white text-base">{selectedSchedule.grade}</p>
+                      <p className="text-gray-500 text-xs mt-1">{selectedSchedule.curriculum}</p>
+                    </div>
+                  </div>
+                  
+                  {selectedSchedule.room && (
+                    <div className="flex items-start space-x-3">
+                      <MapPinIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+                      <div>
+                        <p className="text-gray-400 text-sm font-medium">Location</p>
+                        <p className="text-white text-base">Room {selectedSchedule.room}</p>
                       </div>
-                    );
-                  })}
-                </Fragment>
-              ))}
+                    </div>
+                  )}
+                  
+                  <div className="flex items-start space-x-3">
+                    <BookOpenIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Day</p>
+                      <p className="text-white text-base">{getScheduleDay(selectedSchedule)}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Description section if available */}
+                {selectedSchedule.description && (
+                  <div className="pt-4 border-t border-gray-800">
+                    <h4 className="text-gray-300 font-medium mb-2">Description</h4>
+                    <p className="text-gray-400">{selectedSchedule.description}</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Modal Footer */}
+              <div className="border-t border-gray-800 p-4 flex justify-end">
+                <button 
+                  onClick={closeModal}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
       </div>
-      
-      {/* Simple Modal Implementation */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
-            <div className="fixed inset-0 bg-black bg-opacity-75 transition-opacity" onClick={() => setIsAddModalOpen(false)}></div>
-            
-            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-900 shadow-xl rounded-2xl border border-gray-800 relative z-20">
-              <h3 className="text-lg font-medium leading-6 text-white mb-4">
-                Schedule a Class
-                {selectedDay && (
-                  <span className="block text-sm text-gray-400 mt-1">
-                    {format(selectedDay, 'EEEE, MMMM d, yyyy')} at {selectedHour}:00
-                  </span>
-                )}
-              </h3>
-              
-              {/* Teacher Information */}
-              {selectedTeacher && (
-                <div className="mb-4 p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg">
-                  <div className="font-medium text-blue-300">{selectedTeacher.name}</div>
-                  <div className="text-sm text-gray-300">Subject: {selectedTeacher.subject}</div>
-                </div>
-              )}
-              
-              <div className="mt-4 space-y-4">
-                {/* Grade */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Grade
-                  </label>
-                  <select
-                    value={newSchedule.grade}
-                    onChange={(e) => setNewSchedule({ ...newSchedule, grade: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {GRADES.map(grade => (
-                      <option key={grade} value={grade}>
-                        {grade}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                {/* Curriculum */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Curriculum
-                  </label>
-                  <select
-                    value={newSchedule.curriculum}
-                    onChange={(e) => setNewSchedule({ ...newSchedule, curriculum: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select a curriculum</option>
-                    {CURRICULUMS.map(curriculum => (
-                      <option key={curriculum} value={curriculum}>
-                        {curriculum}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                {/* Room */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Room
-                  </label>
-                  <input
-                    type="text"
-                    value={newSchedule.room || ''}
-                    onChange={(e) => setNewSchedule({ ...newSchedule, room: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Room number"
-                  />
-                </div>
-                
-                {/* Time */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                      Start Time
-                    </label>
-                    <input
-                      type="time"
-                      value={newSchedule.start_time}
-                      onChange={(e) => setNewSchedule({ ...newSchedule, start_time: e.target.value })}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">
-                      End Time
-                    </label>
-                    <input
-                      type="time"
-                      value={newSchedule.end_time}
-                      onChange={(e) => setNewSchedule({ ...newSchedule, end_time: e.target.value })}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-                
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={newSchedule.description}
-                    onChange={(e) => setNewSchedule({ ...newSchedule, description: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    placeholder="Class description"
-                  />
-                </div>
-                
-                {/* Repeats */}
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="repeats"
-                    checked={newSchedule.repeats}
-                    onChange={(e) => setNewSchedule({ ...newSchedule, repeats: e.target.checked })}
-                    className="h-4 w-4 text-blue-500 focus:ring-blue-500 border-gray-700 rounded"
-                  />
-                  <label htmlFor="repeats" className="ml-2 block text-sm text-gray-400">
-                    Repeats weekly
-                  </label>
-                </div>
-              </div>
-              
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                  onClick={() => setIsAddModalOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
-                  onClick={handleAddSchedule}
-                >
-                  Schedule Class
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Schedule Detail Modal */}
-      {isDetailModalOpen && selectedSchedule && (
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center">
-            <div className="fixed inset-0 bg-black bg-opacity-75 transition-opacity" onClick={() => setIsDetailModalOpen(false)}></div>
-            
-            <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-gray-900 shadow-xl rounded-2xl border border-gray-800 relative z-20">
-              <h3 className="text-xl font-bold text-white mb-2 bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
-                {selectedSchedule.subject}
-              </h3>
-              
-              <div className="mt-4 space-y-4">
-                {/* Teacher Information */}
-                <div className="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg">
-                  <div className="font-medium text-blue-300">{selectedSchedule.teachers?.name || 'Unknown Teacher'}</div>
-                  <div className="text-sm text-gray-300">Subject: {selectedSchedule.subject}</div>
-                </div>
-                
-                {/* Schedule Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm font-medium text-gray-400">Day</div>
-                    <div className="text-white">{selectedSchedule.day}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-400">Date</div>
-                    <div className="text-white">{selectedSchedule.date_tag}</div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm font-medium text-gray-400">Time</div>
-                    <div className="text-white">
-                      {formatTime(selectedSchedule.start_time)} - {formatTime(selectedSchedule.end_time)}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-400">Repeats</div>
-                    <div className="text-white">{selectedSchedule.repeats ? 'Yes' : 'No'}</div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm font-medium text-gray-400">Grade</div>
-                    <div className="text-white">{selectedSchedule.grade}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-400">Room</div>
-                    <div className="text-white">{selectedSchedule.room || 'No Room Assigned'}</div>
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="text-sm font-medium text-gray-400">Curriculum</div>
-                  <div className="text-white">{selectedSchedule.curriculum || 'Not specified'}</div>
-                </div>
-                
-                {selectedSchedule.description && (
-                  <div>
-                    <div className="text-sm font-medium text-gray-400">Description</div>
-                    <div className="text-white mt-1 p-3 bg-gray-800/50 rounded-lg">
-                      {selectedSchedule.description}
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-                  onClick={() => setIsDetailModalOpen(false)}
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
-                  onClick={() => {
-                    // Here you could implement edit functionality
-                    setIsDetailModalOpen(false);
-                    // Open edit modal or implement inline editing
-                  }}
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Add custom scrollbar styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 10px;
+          height: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(31, 41, 55, 0.5);
+          border-radius: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(75, 85, 99, 0.5);
+          border-radius: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(107, 114, 128, 0.7);
+        }
+        
+        /* For Firefox */
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(75, 85, 99, 0.5) rgba(31, 41, 55, 0.5);
+        }
+      `}</style>
     </div>
   );
 } 

@@ -10,6 +10,7 @@ export default function Navbar() {
   const navigation = [
     { name: 'Schedules', href: 'schedules' },
     { name: 'Edit Schedules', href: 'edit-schedules' },
+    { name: 'Teacher Schedule', href: '/teacher-schedule' },
     { name: 'News', href: 'news' },
     { name: 'Site Editor', href: 'site-editor' },
     { name: 'Images', href: 'images' },
@@ -33,7 +34,7 @@ export default function Navbar() {
 
   const isActive = (path: string) => {
     // Use exact path matching to prevent partial matches
-    return location.pathname === `/dashboard/${path}`;
+    return location.pathname === path || location.pathname === `/dashboard/${path}`;
   };
 
   const handleLogout = () => {
