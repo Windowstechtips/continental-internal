@@ -8,14 +8,12 @@ export default function Navbar() {
   const location = useLocation();
 
   const navigation = [
-    { name: 'Schedules', href: 'schedules' },
-    { name: 'Edit Schedules', href: 'edit-schedules' },
     { name: 'Teacher Schedule', href: '/teacher-schedule' },
     { name: 'News', href: 'news' },
     { name: 'Site Editor', href: 'site-editor' },
     { name: 'Images', href: 'images' },
     { name: 'Store', href: 'store' },
-    { name: 'Auth', href: 'auth' },
+    { name: 'Teachers', href: 'teachers' },
   ];
 
   // Add scroll effect

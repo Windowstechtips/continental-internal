@@ -78,7 +78,7 @@ body {
 }
 
 .glass-dark {
-  @apply bg-black/30 backdrop-blur-md border border-gray-800/50 shadow-glass-strong;
+  @apply bg-gray-900/75 backdrop-blur-[6px] border border-gray-800/40 shadow-lg;
 }
 
 /* Modern button styles */

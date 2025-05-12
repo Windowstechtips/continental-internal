@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 
 interface Teacher {
@@ -189,11 +189,11 @@ export default function PresentationView() {
 
     return (
       <div 
-        className={`relative rounded-xl ${isCompact ? 'p-2' : 'p-3.5'} glass-dark border transition-all ${
-          isPast ? 'opacity-60 border-gray-800/30' :
-          isCanceledToday ? 'border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 
-          isActive ? 'border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]' :
-          isUpcoming ? 'border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]' :
+        className={`relative rounded-xl ${isCompact ? 'p-2' : 'p-3.5'} bg-gray-900/75 border transition-all backdrop-blur-md ${
+          isPast ? 'opacity-60 border-gray-800/40' :
+          isCanceledToday ? 'border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 
+          isActive ? 'border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)]' :
+          isUpcoming ? 'border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.15)]' :
           'border-gray-800/50'
         } overflow-hidden`}
       >
@@ -322,41 +322,25 @@ export default function PresentationView() {
 
   return (
     <div className="h-screen bg-[#0a0a0a] overflow-y-auto relative">
-      {/* Enhanced background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {/* Primary gradient mesh - larger, more diffused gradients with increased opacity */}
-        <div className="absolute -top-[10%] right-[5%] w-[90vw] h-[80vh] bg-gradient-to-bl from-blue-600/15 via-blue-400/10 to-transparent rounded-[100%] filter blur-[80px] animate-pulse-slow" style={{ animationDelay: '0s' }}></div>
-        <div className="absolute -bottom-[10%] left-[5%] w-[90vw] h-[80vh] bg-gradient-to-tr from-blue-500/15 via-blue-300/10 to-transparent rounded-[100%] filter blur-[80px] animate-pulse-slow" style={{ animationDelay: '4s' }}></div>
-        
-        {/* Secondary gradient accents - more vibrant with increased opacity */}
-        <div className="absolute top-[25%] left-[15%] w-[50vw] h-[50vh] bg-gradient-to-r from-cyan-500/15 to-blue-400/10 rounded-full filter blur-[60px] animate-pulse-slow animate-float" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-[25%] right-[15%] w-[50vw] h-[50vh] bg-gradient-to-r from-blue-500/15 to-sky-400/10 rounded-full filter blur-[60px] animate-pulse-slow animate-float" style={{ animationDelay: '6s' }}></div>
-        
-        {/* Additional vibrant accent points */}
-        <div className="absolute top-[15%] right-[20%] w-[30vw] h-[30vh] bg-gradient-to-r from-purple-500/10 to-indigo-400/8 rounded-full filter blur-[70px] animate-pulse-slow animate-float" style={{ animationDelay: '3s' }}></div>
-        <div className="absolute bottom-[15%] left-[20%] w-[30vw] h-[30vh] bg-gradient-to-r from-indigo-500/10 to-purple-400/8 rounded-full filter blur-[70px] animate-pulse-slow animate-float" style={{ animationDelay: '7s' }}></div>
-        
-        {/* Tertiary accent points - brighter light sources */}
-        <div className="absolute top-[40%] right-[30%] w-[20vw] h-[20vh] bg-blue-400/8 rounded-full filter blur-[40px] animate-float animate-glow" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-[40%] left-[30%] w-[20vw] h-[20vh] bg-sky-400/8 rounded-full filter blur-[40px] animate-float animate-glow" style={{ animationDelay: '5s' }}></div>
-        
-        {/* Focal point highlights - small but intense light spots */}
-        <div className="absolute top-[30%] left-[40%] w-[8vw] h-[8vh] bg-blue-300/15 rounded-full filter blur-[20px] animate-pulse-slow animate-glow" style={{ animationDelay: '2.5s' }}></div>
-        <div className="absolute bottom-[30%] right-[40%] w-[8vw] h-[8vh] bg-cyan-300/15 rounded-full filter blur-[20px] animate-pulse-slow animate-glow" style={{ animationDelay: '5.5s' }}></div>
-        
-        {/* New dynamic color spots */}
-        <div className="absolute top-[60%] right-[10%] w-[15vw] h-[15vh] bg-gradient-to-r from-pink-500/12 to-rose-400/8 rounded-full filter blur-[30px] animate-float animate-glow" style={{ animationDelay: '4.5s' }}></div>
-        <div className="absolute bottom-[60%] left-[10%] w-[15vw] h-[15vh] bg-gradient-to-r from-amber-500/12 to-yellow-400/8 rounded-full filter blur-[30px] animate-float animate-glow" style={{ animationDelay: '3.5s' }}></div>
-        
-        {/* Subtle grain overlay for texture */}
-        <div className="absolute inset-0 bg-noise"></div>
+      {/* Simplified background elements with higher quality blur */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Primary gradients - fewer elements with higher quality blur */}
+        <div className="absolute top-0 left-0 w-full h-full">
+          {/* Main gradient background */}
+          <div className="absolute top-0 right-0 w-[80%] h-[70%] bg-gradient-to-bl from-blue-600/15 to-transparent rounded-[100%] filter blur-[100px] opacity-60"></div>
+          <div className="absolute bottom-0 left-0 w-[80%] h-[70%] bg-gradient-to-tr from-blue-500/15 to-transparent rounded-[100%] filter blur-[100px] opacity-60"></div>
+          
+          {/* Accent gradients - positioned with less overlap */}
+          <div className="absolute top-[30%] left-[20%] w-[40%] h-[40%] bg-gradient-to-r from-cyan-500/15 to-blue-400/10 rounded-full filter blur-[90px] opacity-70"></div>
+          <div className="absolute bottom-[30%] right-[20%] w-[40%] h-[40%] bg-gradient-to-r from-blue-500/15 to-sky-400/10 rounded-full filter blur-[90px] opacity-70"></div>
+        </div>
       </div>
 
       {/* Content container */}
       <div className="relative z-10 container mx-auto p-4 lg:p-6 pb-20">
         {/* Header with time and date */}
         <header className="mb-6 lg:mb-8">
-          <div className="glass-dark rounded-xl p-4 border border-gray-800/30 shadow-glass-strong backdrop-blur-md">
+          <div className="bg-gray-900/80 rounded-xl p-4 border border-gray-800/50 shadow-lg backdrop-blur-md">
             <div className="flex flex-row justify-between items-center">
               <div className="flex items-center gap-4">
                 {/* Continental Logo */}
@@ -390,7 +374,7 @@ export default function PresentationView() {
             <div className="relative">
               <button
                 onClick={() => setActiveFilter(activeFilter === 'status' ? 'grade' : activeFilter === 'grade' ? 'teacher' : 'status')}
-                className="glass-dark rounded-xl px-4 py-2 border border-gray-800/30 shadow-glass-strong backdrop-blur-md flex items-center gap-2 hover:bg-gray-800/30 transition-all"
+                className="bg-gray-900/80 rounded-xl px-4 py-2 border border-gray-800/50 shadow-lg backdrop-blur-md flex items-center gap-2 hover:bg-gray-800/60 transition-all"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -407,7 +391,7 @@ export default function PresentationView() {
         {/* Main content */}
         <main>
           {error ? (
-            <div className="glass-dark rounded-xl p-4 border border-red-800/30 shadow-glass-strong backdrop-blur-md">
+            <div className="bg-gray-900/80 rounded-xl p-4 border border-red-800/50 shadow-lg backdrop-blur-md">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-red-900/30 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -421,7 +405,7 @@ export default function PresentationView() {
               </div>
             </div>
           ) : schedules.length === 0 ? (
-            <div className="glass-dark rounded-xl p-6 border border-gray-800/30 shadow-glass-strong backdrop-blur-md text-center">
+            <div className="bg-gray-900/80 rounded-xl p-6 border border-gray-800/50 shadow-lg backdrop-blur-md text-center">
               <div className="flex flex-col items-center justify-center py-6">
                 <div className="w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center mb-4">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -569,11 +553,11 @@ export default function PresentationView() {
                       return (
                         <div 
                           key={teacher.id} 
-                          className={`glass-dark rounded-xl p-4 border ${
+                          className={`bg-gray-900/80 rounded-xl p-4 border ${
                             hasCompletedSchedules 
-                              ? 'border-gray-700/30 bg-gradient-to-br from-gray-900/60 to-gray-800/60' 
-                              : 'border-gray-800/30'
-                          }`}
+                              ? 'border-gray-700/40 bg-gradient-to-br from-gray-900/70 to-gray-800/70' 
+                              : 'border-gray-800/40'
+                          } backdrop-blur-md`}
                         >
                           <h2 className={`text-xl font-medium mb-4 ${
                             hasCompletedSchedules 

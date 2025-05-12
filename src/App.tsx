@@ -1,15 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import Schedules from './components/Schedules';
-import EditSchedules from './components/EditSchedules';
 import News from './components/News';
 import PresentationView from './components/PresentationView';
 import SiteEditor from './components/SiteEditor';
 import Store from './components/Store/Store';
 import Images from './components/Images';
 import TeacherSchedule from './components/TeacherSchedule';
-import Auth from './components/Auth';
+import Teachers from './components/Teachers';
 
 export default function App() {
   // Check if user is authenticated
@@ -39,14 +37,12 @@ export default function App() {
           path="/dashboard"
           element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
         >
-          <Route index element={<Schedules />} />
-          <Route path="schedules" element={<Schedules />} />
-          <Route path="edit-schedules" element={<EditSchedules />} />
+          <Route index element={<News />} />
           <Route path="news" element={<News />} />
           <Route path="site-editor" element={<SiteEditor />} />
           <Route path="images/*" element={<Images />} />
           <Route path="store/*" element={<Store />} />
-          <Route path="auth" element={<Auth />} />
+          <Route path="teachers" element={<Teachers />} />
         </Route>
 
         {/* Redirect all other routes */}

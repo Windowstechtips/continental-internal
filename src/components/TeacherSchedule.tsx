@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
-import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon, MapPinIcon, AcademicCapIcon, ClockIcon, BookOpenIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon, MapPinIcon, AcademicCapIcon, ClockIcon, BookOpenIcon, HomeIcon, PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
 
 interface Teacher {
   id: number;
@@ -32,6 +32,21 @@ interface Schedule {
   description: string;
 }
 
+// New interface for scheduling
+interface ScheduleFormData {
+  subject: string;
+  grade: string;
+  curriculum: string;
+  room: string;
+  teacher_id: number;
+  day: string;
+  start_time: string;
+  end_time: string;
+  repeats: boolean;
+  date_tag: string;
+  description: string;
+}
+
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 7); // 7 AM to 12 AM (midnight)
 
 export default function TeacherSchedule() {
@@ -49,9 +64,42 @@ export default function TeacherSchedule() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [mobileStartDate, setMobileStartDate] = useState(new Date()); // For mobile view dates
   const [showAllSchedules, setShowAllSchedules] = useState(false); // State for showing all schedules
+  
+  // New states for scheduling
+  const [canSchedule, setCanSchedule] = useState(false);
+  const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
+  const [schedulingFormData, setSchedulingFormData] = useState<ScheduleFormData>({
+    subject: '',
+    grade: '',
+    curriculum: '',
+    room: '',
+    teacher_id: 0,
+    day: '',
+    start_time: '',
+    end_time: '',
+    repeats: true,
+    date_tag: '',
+    description: ''
+  });
+  const [selectedScheduleDay, setSelectedScheduleDay] = useState<Date | null>(null);
+  const [selectedScheduleHour, setSelectedScheduleHour] = useState<number | null>(null);
+  
+  // New states for deletion options
+  const [showDeleteOptions, setShowDeleteOptions] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<'cancel' | 'delete' | null>(null);
+
+  // New state for edit mode
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Get the current week's start date (Monday)
   const startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
+
+  // Check if user came from homepage/dashboard (can schedule) or login page (cannot schedule)
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    setCanSchedule(isAuthenticated);
+  }, []);
 
   // Check if the screen is in mobile view
   useEffect(() => {
@@ -126,10 +174,28 @@ export default function TeacherSchedule() {
     }
   }, [loading, currentTime]);
 
-  // Fetch teachers and schedules
+  // Start timer to update current time and fetch data when filters change
   useEffect(() => {
     fetchData();
-  }, [currentDate, selectedTeacher, showAllSchedules]);
+    
+    // Start timer to update current time line
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(timer);
+  }, [currentDate, selectedTeacher, selectedSubject, showAllSchedules]);
+  
+  // Log schedules with canceled dates when they change
+  useEffect(() => {
+    const schedulesWithCanceledDates = schedules.filter(
+      schedule => schedule.canceled_dates && schedule.canceled_dates.length > 0
+    );
+    
+    if (schedulesWithCanceledDates.length > 0) {
+      console.log('Schedules with canceled dates:', schedulesWithCanceledDates);
+    }
+  }, [schedules]);
 
   async function fetchData() {
     try {
@@ -199,8 +265,15 @@ export default function TeacherSchedule() {
   const getSchedulesForDayAndHour = (day: Date, hour: number) => {
     const dayString = format(day, 'EEEE');
     const dateString = format(day, 'yyyy-MM-dd');
+    // Format for canceled_dates array (M/d format)
+    const cancelDateString = format(day, 'M/d');
     
     return schedules.filter(schedule => {
+      // Check if this date is in the canceled_dates array
+      if (schedule.canceled_dates && schedule.canceled_dates.includes(cancelDateString)) {
+        return false; // Skip this schedule as it's canceled for this date
+      }
+      
       const isDayMatch = 
         (schedule.repeats && schedule.day === dayString) || 
         (!schedule.repeats && schedule.date_tag === dateString);
@@ -260,8 +333,10 @@ export default function TeacherSchedule() {
   };
 
   // Handle card click
-  const handleCardClick = (schedule: Schedule) => {
+  const handleCardClick = (schedule: Schedule, day: Date) => {
     setSelectedSchedule(schedule);
+    setSelectedScheduleDay(day);
+    setShowDeleteOptions(canSchedule); // Only show delete options if user can schedule
     setIsModalOpen(true);
   };
 
@@ -269,6 +344,129 @@ export default function TeacherSchedule() {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedSchedule(null);
+    setShowDeleteOptions(false);
+    setDeleteMode(null);
+  };
+
+  // Toggle delete options
+  const toggleDeleteOptions = () => {
+    setShowDeleteOptions(!showDeleteOptions);
+  };
+
+  // Handle delete button click
+  const handleDeleteClick = (mode: 'cancel' | 'delete') => {
+    console.log('Delete button clicked with mode:', mode);
+    console.log('Current selected schedule:', selectedSchedule);
+    console.log('Current selected day:', selectedScheduleDay);
+    
+    setDeleteMode(mode);
+    setShowDeleteOptions(false);
+    setIsConfirmDeleteOpen(true);
+  };
+
+  // Close confirm delete modal
+  const closeConfirmDelete = () => {
+    setIsConfirmDeleteOpen(false);
+    setDeleteMode(null);
+  };
+
+  // Cancel a specific date for a recurring schedule
+  const cancelScheduleForDate = async (schedule: Schedule, date: Date) => {
+    if (!schedule || !schedule.id) return;
+    
+    try {
+      // Log various date formats for debugging
+      console.log('Date formats for:', date);
+      console.log('- M/d:', format(date, 'M/d'));
+      console.log('- MM/dd:', format(date, 'MM/dd'));
+      console.log('- yyyy-MM-dd:', format(date, 'yyyy-MM-dd'));
+      
+      // Format the date to match the format in canceled_dates
+      // Use MM/dd format (e.g., "5/12" for May 12)
+      const dateString = format(date, 'M/d');
+      
+      console.log('Canceling date:', dateString);
+      console.log('Current canceled dates:', schedule.canceled_dates);
+      
+      // Get current canceled dates or initialize an empty array
+      const canceledDates = schedule.canceled_dates || [];
+      
+      // Add the new date if it's not already included
+      if (!canceledDates.includes(dateString)) {
+        canceledDates.push(dateString);
+      }
+      
+      console.log('New canceled dates:', canceledDates);
+      
+      // Update the schedule with the new canceled date
+      const { error } = await supabase
+        .from('class_schedules')
+        .update({ canceled_dates: canceledDates })
+        .eq('id', schedule.id);
+      
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      // Close modal and refresh data
+      closeModal();
+      closeConfirmDelete();
+      fetchData();
+    } catch (error) {
+      console.error('Error canceling schedule:', error);
+      setError('Failed to cancel class. Please try again.');
+    }
+  };
+
+  // Delete a schedule completely
+  const deleteSchedule = async (schedule: Schedule) => {
+    if (!schedule || !schedule.id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('class_schedules')
+        .delete()
+        .eq('id', schedule.id);
+      
+      if (error) throw error;
+      
+      // Close modal and refresh data
+      closeModal();
+      closeConfirmDelete();
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting schedule:', error);
+      setError('Failed to delete class. Please try again.');
+    }
+  };
+
+  // Confirm deletion or cancellation
+  const confirmDelete = () => {
+    console.log('Confirm delete called. Delete mode:', deleteMode);
+    console.log('Selected schedule:', selectedSchedule);
+    console.log('Selected day:', selectedScheduleDay);
+    
+    if (!selectedSchedule) {
+      console.error('No schedule selected for deletion/cancellation');
+      return;
+    }
+    
+    if (deleteMode === 'cancel') {
+      // Cancel for specific date
+      if (selectedScheduleDay) {
+        console.log('Canceling schedule for date:', format(selectedScheduleDay, 'yyyy-MM-dd'));
+        cancelScheduleForDate(selectedSchedule, selectedScheduleDay);
+      } else {
+        console.error('No day selected for cancellation');
+      }
+    } else if (deleteMode === 'delete') {
+      // Delete entire schedule
+      console.log('Deleting entire schedule with ID:', selectedSchedule.id);
+      deleteSchedule(selectedSchedule);
+    } else {
+      console.error('Invalid delete mode:', deleteMode);
+    }
   };
 
   // Get day of schedule
@@ -282,13 +480,192 @@ export default function TeacherSchedule() {
     }
   };
 
+  // Get available subjects for a teacher
+  const getTeacherSubjects = (teacherId: number): string[] => {
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return [];
+    
+    // Find all teachers with the same name and collect their subjects
+    const teachersWithSameName = teachers.filter(t => t.name === teacher.name);
+    const subjects = teachersWithSameName.map(t => t.subject);
+    
+    return [...new Set(subjects)]; // Return unique subjects
+  };
+  
+  // Handle teacher change in form
+  const handleFormTeacherChange = (teacherId: number) => {
+    // Get the teacher
+    const teacher = teachers.find(t => t.id === teacherId);
+    if (!teacher) return;
+    
+    // Get all subjects for this teacher
+    const subjects = getTeacherSubjects(teacherId);
+    
+    // Update the form data with new teacher_id and first available subject
+    setSchedulingFormData({
+      ...schedulingFormData,
+      teacher_id: teacherId,
+      subject: subjects.length > 0 ? subjects[0] : ''
+    });
+  };
+
+  // Handle edit button click
+  const handleEditClick = (e: React.MouseEvent, schedule: Schedule, day: Date) => {
+    e.stopPropagation(); // Prevent opening the detail modal
+    
+    // Format day string (for repeating schedules)
+    const dayString = format(day, 'EEEE');
+    
+    // Format date tag (for non-repeating schedules)
+    const dateTag = format(day, 'yyyy-MM-dd');
+    
+    // Set the schedule data in the form
+    setSchedulingFormData({
+      subject: schedule.subject,
+      grade: schedule.grade,
+      curriculum: schedule.curriculum,
+      room: schedule.room || '',
+      teacher_id: schedule.teacher_id,
+      day: schedule.day,
+      start_time: schedule.start_time,
+      end_time: schedule.end_time,
+      repeats: schedule.repeats,
+      date_tag: schedule.date_tag,
+      description: schedule.description || ''
+    });
+    
+    // Set the selected day and hour for the scheduling modal
+    const hour = parseInt(schedule.start_time.split(':')[0], 10);
+    setSelectedScheduleDay(day);
+    setSelectedScheduleHour(hour);
+    
+    // Set edit mode
+    setIsEditMode(true);
+    
+    // Open the scheduling modal
+    setIsSchedulingModalOpen(true);
+    
+    // Set selected schedule for possible deletion later
+    setSelectedSchedule(schedule);
+  };
+
+  // Update handleScheduleClick to reset edit mode
+  const handleScheduleClick = (day: Date, hour: number) => {
+    if (!canSchedule) return;
+    
+    // Set the selected day and hour
+    setSelectedScheduleDay(day);
+    setSelectedScheduleHour(hour);
+    
+    // Format start and end times
+    const startTime = `${hour.toString().padStart(2, '0')}:00`;
+    const endTime = `${(hour + 1).toString().padStart(2, '0')}:00`;
+    
+    // Format day string (for repeating schedules)
+    const dayString = format(day, 'EEEE');
+    
+    // Format date tag (for non-time schedules)
+    const dateTag = format(day, 'yyyy-MM-dd');
+    
+    // Get initial teacher ID from available teachers
+    const initialTeacherId = selectedTeacher?.id || (teachersWithSubjects[0]?.id || 0);
+    
+    // Get subjects for the initial teacher
+    const initialSubjects = getTeacherSubjects(initialTeacherId);
+    const initialSubject = initialSubjects.length > 0 ? initialSubjects[0] : '';
+    
+    // Initialize form data
+    setSchedulingFormData({
+      subject: initialSubject,
+      grade: 'Grade 9',
+      curriculum: 'Edexcel',
+      room: '', // We keep this in the state but won't show it in the UI
+      teacher_id: initialTeacherId,
+      day: dayString,
+      start_time: startTime,
+      end_time: endTime,
+      repeats: true,
+      date_tag: dateTag,
+      description: ''
+    });
+    
+    // Reset edit mode
+    setIsEditMode(false);
+    setSelectedSchedule(null);
+    
+    // Open the scheduling modal
+    setIsSchedulingModalOpen(true);
+  };
+  
+  // Update handleScheduleSubmit to handle both create and edit
+  const handleScheduleSubmit = async () => {
+    try {
+      if (isEditMode && selectedSchedule) {
+        // Update existing schedule
+        const { error } = await supabase
+          .from('class_schedules')
+          .update({
+            subject: schedulingFormData.subject,
+            grade: schedulingFormData.grade,
+            curriculum: schedulingFormData.curriculum,
+            room: null, // Always set room to null since we removed this field
+            teacher_id: schedulingFormData.teacher_id,
+            day: schedulingFormData.day,
+            start_time: schedulingFormData.start_time,
+            end_time: schedulingFormData.end_time,
+            repeats: schedulingFormData.repeats,
+            date_tag: schedulingFormData.date_tag,
+            description: schedulingFormData.description
+          })
+          .eq('id', selectedSchedule.id);
+          
+        if (error) throw error;
+      } else {
+        // Create new schedule
+        const { error } = await supabase
+          .from('class_schedules')
+          .insert([{
+            subject: schedulingFormData.subject,
+            grade: schedulingFormData.grade,
+            curriculum: schedulingFormData.curriculum,
+            room: null, // Always set room to null since we removed this field
+            teacher_id: schedulingFormData.teacher_id,
+            day: schedulingFormData.day,
+            start_time: schedulingFormData.start_time,
+            end_time: schedulingFormData.end_time,
+            repeats: schedulingFormData.repeats,
+            date_tag: schedulingFormData.date_tag,
+            description: schedulingFormData.description
+          }]);
+        
+        if (error) throw error;
+      }
+      
+      // Close modal and refresh data
+      setIsSchedulingModalOpen(false);
+      setIsEditMode(false);
+      setSelectedSchedule(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error scheduling class:', error);
+      setError('Failed to schedule class. Please try again.');
+    }
+  };
+  
+  // Update closeSchedulingModal to reset edit mode
+  const closeSchedulingModal = () => {
+    setIsSchedulingModalOpen(false);
+    setIsEditMode(false);
+    setSelectedSchedule(null);
+  };
+
   // Render a schedule cell
   const renderScheduleCell = (day: Date, hour: number) => {
     const schedules = getSchedulesForDayAndHour(day, hour);
     const now = new Date();
     
     return (
-      <div className="relative min-h-[60px] bg-gray-800/30">
+      <div className="relative min-h-[60px] bg-gray-800/30 group/cell">
         {schedules.map(schedule => {
           // Check if the schedule has finished (either a past day or finished today)
           const isPastDay = day < now && !isSameDay(day, now);
@@ -302,14 +679,14 @@ export default function TeacherSchedule() {
           return (
             <div
               key={schedule.id}
-              onClick={() => handleCardClick(schedule)}
+              onClick={() => handleCardClick(schedule, day)}
               className={`absolute inset-x-1 ${
                 isFinished 
                   ? 'bg-gray-800/90 border-gray-700/50 hover:bg-gray-700/90' 
                   : 'bg-gradient-to-br from-blue-600/30 to-indigo-500/20 hover:from-blue-600/40 hover:to-indigo-500/30 border-blue-400/40'
               } border rounded-md p-2 text-xs ${
                 isFinished ? 'text-gray-400' : 'text-gray-200'
-              } shadow-md transition-all duration-200 overflow-hidden cursor-pointer transform hover:scale-[1.02] hover:z-20`}
+              } shadow-md transition-all duration-200 overflow-hidden cursor-pointer transform hover:scale-[1.02] hover:z-20 group`}
               style={{
                 height: calculateScheduleHeight(schedule.start_time, schedule.end_time),
                 top: '1px',
@@ -320,6 +697,17 @@ export default function TeacherSchedule() {
               <div className={`absolute top-0 left-0 right-0 h-1 ${
                 isFinished ? 'bg-gray-600/60' : 'bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400'
               } rounded-t`}></div>
+              
+              {/* Edit button - only shown on hover and when user has scheduling rights */}
+              {canSchedule && (
+                <div 
+                  className="absolute top-1 right-1 p-1 rounded-full bg-gray-900/70 opacity-0 group-hover:opacity-100 cursor-pointer transition-all duration-200 hover:bg-blue-600/70 z-10"
+                  onClick={(e) => handleEditClick(e, schedule, day)}
+                  title="Edit schedule"
+                >
+                  <PencilIcon className="h-3.5 w-3.5 text-white" />
+                </div>
+              )}
               
               <div className="flex flex-col h-full relative">
                 {/* Decorative circle in background */}
@@ -376,6 +764,18 @@ export default function TeacherSchedule() {
             </div>
           );
         })}
+        
+        {/* Add scheduling option for empty cells if user has scheduling rights */}
+        {canSchedule && schedules.length === 0 && (
+          <div 
+            onClick={() => handleScheduleClick(day, hour)}
+            className="absolute inset-0 flex items-center justify-center cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-full bg-gray-800/80 border border-gray-700/50 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity duration-200 hover:bg-gray-700/80">
+              <PlusIcon className="h-5 w-5 text-blue-400" />
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -433,6 +833,19 @@ export default function TeacherSchedule() {
     }
   };
 
+  // Handle home button click
+  const handleHomeClick = () => {
+    // Check if user is authenticated, which means they came from the dashboard
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    
+    // If authenticated, send to dashboard, otherwise to login
+    if (isAuthenticated) {
+      window.location.href = '/dashboard';
+    } else {
+      window.location.href = '/login';
+    }
+  };
+
   return (
     <div className="min-h-screen w-full">
       {/* Simplified background decorative elements */}
@@ -445,7 +858,17 @@ export default function TeacherSchedule() {
       <div className="relative z-10 p-4 md:p-6 flex flex-col h-[calc(100vh-2rem)]">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex flex-col md:flex-row md:items-center md:space-x-6 space-y-4 md:space-y-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-white">Teacher Schedule</h1>
+            <div className="flex items-center">
+              <button
+                onClick={handleHomeClick}
+                className="mr-3 p-2 rounded-lg bg-gray-800/60 text-gray-300 hover:bg-gray-700 hover:text-white transition-all duration-200 flex items-center"
+                aria-label="Go to home"
+              >
+                <HomeIcon className="h-5 w-5 mr-1" />
+                <span>Home</span>
+              </button>
+              <h1 className="text-2xl md:text-3xl font-bold text-white">Teacher Schedule</h1>
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
             <div className="flex flex-wrap gap-4 items-center w-full">
@@ -654,12 +1077,60 @@ export default function TeacherSchedule() {
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
                 <div className="relative p-5 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-white">{selectedSchedule.subject}</h3>
-                  <button 
-                    onClick={closeModal}
-                    className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
+                  <div className="flex items-center space-x-2 relative">
+                    {showDeleteOptions && (
+                      <button 
+                        onClick={toggleDeleteOptions}
+                        className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                      >
+                        <XMarkIcon className="h-6 w-6" />
+                      </button>
+                    )}
+                    {canSchedule && !showDeleteOptions && (
+                      <button 
+                        onClick={toggleDeleteOptions}
+                        className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
+                        </svg>
+                      </button>
+                    )}
+                    <button 
+                      onClick={closeModal}
+                      className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                    >
+                      <XMarkIcon className="h-6 w-6" />
+                    </button>
+                    
+                    {/* Delete Options Menu - Now positioned properly */}
+                    {showDeleteOptions && (
+                      <div className="absolute right-0 top-10 bg-gray-800 rounded-lg border border-gray-700/50 shadow-lg z-20 overflow-hidden">
+                        <div className="p-1">
+                          {selectedSchedule.repeats && (
+                            <button
+                              onClick={() => handleDeleteClick('cancel')}
+                              className="flex items-center w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700/50 rounded-md transition-colors"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+                              </svg>
+                              Cancel this occurrence
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteClick('delete')}
+                            className="flex items-center w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700/50 rounded-md transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            Delete {selectedSchedule.repeats ? 'all occurrences' : 'class'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -724,6 +1195,236 @@ export default function TeacherSchedule() {
                   className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal for Deletion/Cancellation */}
+        {isConfirmDeleteOpen && selectedSchedule && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeConfirmDelete}>
+            <div 
+              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-400 opacity-90"></div>
+                <div className="relative p-5 flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-white">
+                    {deleteMode === 'cancel' ? 'Cancel Class' : 'Delete Class'}
+                  </h3>
+                  <button 
+                    onClick={closeConfirmDelete}
+                    className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Modal Content */}
+              <div className="p-5 space-y-4">
+                <div className="text-gray-300">
+                  {deleteMode === 'cancel' ? (
+                    <p>
+                      Are you sure you want to cancel <span className="text-white font-medium">{selectedSchedule.subject}</span> on <span className="text-white font-medium">{format(selectedScheduleDay || new Date(), 'EEEE, MMMM d, yyyy')}</span>?
+                    </p>
+                  ) : (
+                    <p>
+                      Are you sure you want to delete {selectedSchedule.repeats ? 'all occurrences of ' : ''}<span className="text-white font-medium">{selectedSchedule.subject}</span>?
+                    </p>
+                  )}
+                  
+                  <div className="mt-2 p-3 bg-red-900/20 border border-red-800/30 rounded-lg text-sm text-red-200">
+                    <p>
+                      {deleteMode === 'cancel' ? 
+                        'This will only cancel this specific occurrence, but the class will continue for other dates.' : 
+                        'This action cannot be undone and will permanently remove this class from the schedule.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Modal Footer */}
+              <div className="border-t border-gray-800 p-4 flex justify-end space-x-3">
+                <button 
+                  onClick={closeConfirmDelete}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                >
+                  {deleteMode === 'cancel' ? 'Confirm Cancellation' : 'Confirm Deletion'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Class Scheduling Modal */}
+        {isSchedulingModalOpen && selectedScheduleDay && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeSchedulingModal}>
+            <div 
+              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal Header with Accent Gradient */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
+                <div className="relative p-5 flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-white">
+                    {isEditMode ? 'Edit Class' : 'Schedule New Class'}
+                  </h3>
+                  <button 
+                    onClick={closeSchedulingModal}
+                    className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Modal Content */}
+              <div className="p-5 space-y-4">
+                <div className="text-gray-300 mb-2 text-sm">
+                  Scheduling for: <span className="text-blue-400 font-medium">{format(selectedScheduleDay, 'EEEE, MMMM d')}</span> at <span className="text-blue-400 font-medium">{selectedScheduleHour && format(new Date().setHours(selectedScheduleHour, 0), 'h:mm a')}</span>
+                </div>
+                
+                {/* Scheduling Form */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Teacher */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Teacher</label>
+                    <select
+                      value={schedulingFormData.teacher_id}
+                      onChange={e => handleFormTeacherChange(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    >
+                      {teachersWithSubjects.map(teacher => (
+                        <option key={teacher.id} value={teacher.id}>
+                          {teacher.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Subject */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                    <select
+                      value={schedulingFormData.subject}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, subject: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    >
+                      {getTeacherSubjects(schedulingFormData.teacher_id).map(subject => (
+                        <option key={subject} value={subject}>
+                          {subject}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Grade */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Grade</label>
+                    <select
+                      value={schedulingFormData.grade}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, grade: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    >
+                      <option value="Grade 9">Grade 9</option>
+                      <option value="Grade 10">Grade 10</option>
+                    </select>
+                  </div>
+                  
+                  {/* Curriculum */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Curriculum</label>
+                    <select
+                      value={schedulingFormData.curriculum}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, curriculum: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    >
+                      <option value="Edexcel">Edexcel</option>
+                      <option value="Cambridge">Cambridge</option>
+                    </select>
+                  </div>
+                  
+                  {/* Start & End Time */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Start Time</label>
+                    <input
+                      type="time"
+                      value={schedulingFormData.start_time}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, start_time: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">End Time</label>
+                    <input
+                      type="time"
+                      value={schedulingFormData.end_time}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, end_time: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    />
+                  </div>
+                  
+                  {/* Repeat Option */}
+                  <div className="col-span-2">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="repeats"
+                        checked={schedulingFormData.repeats}
+                        onChange={e => setSchedulingFormData({...schedulingFormData, repeats: e.target.checked})}
+                        className="h-4 w-4 rounded border-gray-700 bg-gray-800 text-blue-500 focus:ring-blue-600"
+                      />
+                      <label htmlFor="repeats" className="text-sm font-medium text-gray-300">
+                        Repeats Weekly
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {/* Description */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Description (Optional)</label>
+                    <textarea
+                      value={schedulingFormData.description}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, description: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      placeholder="Additional details about the class"
+                      rows={3}
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Modal Footer */}
+              <div className="border-t border-gray-800 p-4 flex justify-end space-x-3">
+                <button 
+                  onClick={closeSchedulingModal}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleScheduleSubmit}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                >
+                  {isEditMode ? 'Update Class' : 'Schedule Class'}
                 </button>
               </div>
             </div>
