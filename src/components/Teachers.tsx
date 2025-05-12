@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   PlusIcon, 
   PencilIcon, 
   XMarkIcon, 
   TrashIcon,
-  CheckIcon,
   BookOpenIcon,
   UserCircleIcon,
   AcademicCapIcon
@@ -69,7 +68,7 @@ export default function Teachers() {
         return;
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('teachers')
         .insert([{ 
           name: formData.name, 

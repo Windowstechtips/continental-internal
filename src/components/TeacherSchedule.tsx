@@ -513,12 +513,6 @@ export default function TeacherSchedule() {
   const handleEditClick = (e: React.MouseEvent, schedule: Schedule, day: Date) => {
     e.stopPropagation(); // Prevent opening the detail modal
     
-    // Format day string (for repeating schedules)
-    const dayString = format(day, 'EEEE');
-    
-    // Format date tag (for non-repeating schedules)
-    const dateTag = format(day, 'yyyy-MM-dd');
-    
     // Set the schedule data in the form
     setSchedulingFormData({
       subject: schedule.subject,
