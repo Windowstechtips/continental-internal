@@ -112,20 +112,26 @@ export default function MainGallery() {
 
   const generateSignature = async (paramsToSign: string) => {
     try {
-      const response = await fetch('/api/cloudinary-signature', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ paramsToSign }),
-      });
+      // IMPORTANT SECURITY WARNING: This is NOT secure for production environments!
+      // In production, this function should call a secure backend API endpoint
+      // that keeps your API secret safe.
       
-      if (!response.ok) {
-        throw new Error('Failed to generate signature');
+      // For development/testing purposes only:
+      const apiSecret = cloudinaryConfig.apiSecret;
+      if (!apiSecret) {
+        throw new Error('Missing Cloudinary API secret');
       }
       
-      const data = await response.json();
-      return data.signature;
+      // Generate the SHA-1 signature
+      const encoder = new TextEncoder();
+      const data = encoder.encode(paramsToSign + apiSecret);
+      const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+      
+      // Convert the hash to a hex string
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      return signature;
     } catch (err) {
       console.error('Error generating signature:', err);
       throw err;
