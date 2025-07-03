@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 
@@ -25,7 +25,39 @@ interface Schedule {
   description: string;
 }
 
-export default function PresentationView() {
+interface PresentationSettings {
+  id: string;
+  show_classes: boolean;
+  show_news: boolean;
+  fullscreen: boolean;
+  transition_speed: number;
+  active_category_id: string | null;
+  display_duration?: number;
+  class_duration?: number;
+}
+
+interface PresentationImage {
+  id: string;
+  category_id: string;
+  image_url: string;
+  file_type: string;
+}
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string;
+  event_date: string;
+}
+
+interface NewsItem {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+}
+
+const PresentationView: React.FC = () => {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,22 +65,42 @@ export default function PresentationView() {
   const [activeFilter, setActiveFilter] = useState<'grade' | 'teacher' | 'status'>('grade');
   const [uniqueGrades, setUniqueGrades] = useState<string[]>([]);
   const [uniqueTeachers, setUniqueTeachers] = useState<Teacher[]>([]);
+  const [settings, setSettings] = useState<PresentationSettings | null>(null);
+  const [images, setImages] = useState<PresentationImage[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [currentClassIndex, setCurrentClassIndex] = useState(0);
+  const [activeClasses, setActiveClasses] = useState<Schedule[]>([]);
 
-  // Request fullscreen on component mount
+  // Request fullscreen if enabled in settings
   useEffect(() => {
-    const element = document.documentElement;
-    if (element.requestFullscreen) {
-      element.requestFullscreen().catch(err => {
-        console.error('Error attempting to enable fullscreen:', err);
-      });
+    if (settings?.fullscreen === true) {
+      const element = document.documentElement;
+      if (element.requestFullscreen) {
+        element.requestFullscreen().catch(err => {
+          console.error('Error attempting to enable fullscreen:', err);
+        });
+      }
     }
 
     // Cleanup: exit fullscreen on unmount
     return () => {
       if (document.fullscreenElement && document.exitFullscreen) {
-        document.exitFullscreen();
+        document.exitFullscreen().catch(err => {
+          console.error('Error attempting to exit fullscreen:', err);
+        });
       }
     };
+  }, [settings?.fullscreen]);
+
+  // Automatic page refresh every minute
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      window.location.reload();
+    }, 60000); // Refresh every 60 seconds
+    
+    return () => clearInterval(refreshInterval);
   }, []);
 
   // Update current time every second
@@ -59,6 +111,99 @@ export default function PresentationView() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch presentation settings and active content
+  const fetchPresentationData = useCallback(async () => {
+    try {
+      // Get settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('presentation_settings')
+        .select('*')
+        .single();
+
+      if (settingsError) throw settingsError;
+      setSettings(settingsData);
+
+      // Get active category images if available
+      if (settingsData?.active_category_id) {
+        const { data: imagesData, error: imagesError } = await supabase
+          .from('presentation_images')
+          .select('*')
+          .eq('category_id', settingsData.active_category_id)
+          .not('file_type', 'eq', 'ppt-original') // Exclude original PPT files
+          .order('created_at', { ascending: false });
+
+        if (imagesError) throw imagesError;
+        console.log('Fetched presentation images:', imagesData);
+        setImages(imagesData || []);
+      }
+
+      // Get today's events if show_classes is true
+      if (settingsData?.show_classes) {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: eventsData, error: eventsError } = await supabase
+          .from('calendar_events')
+          .select('*')
+          .eq('event_date', today)
+          .order('created_at', { ascending: true });
+
+        if (eventsError) throw eventsError;
+        setEvents(eventsData || []);
+      }
+
+      // Get recent news if show_news is true
+      if (settingsData?.show_news) {
+        const { data: newsData, error: newsError } = await supabase
+          .from('news')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (newsError) throw newsError;
+        setNews(newsData || []);
+      }
+    } catch (err) {
+      console.error('Error fetching presentation data:', err);
+      setError('Failed to load presentation data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchPresentationData();
+
+    // Set up real-time subscription for settings changes
+    const settingsSubscription = supabase
+      .channel('presentation_settings_changes')
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'presentation_settings' }, 
+        () => {
+          console.log('Presentation settings updated, refreshing data');
+          fetchPresentationData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(settingsSubscription);
+    };
+  }, [fetchPresentationData]);
+
+  // Image rotation effect
+  useEffect(() => {
+    if (images.length <= 1) return; // No need to rotate if there's only one image or none
+    
+    // Use display_duration if available, fallback to transition_speed for backward compatibility
+    const displayDuration = (settings?.display_duration || settings?.transition_speed || 5) * 1000;
+    
+    const intervalId = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => (prevIndex + 1) % images.length);
+    }, displayDuration);
+    
+    return () => clearInterval(intervalId);
+  }, [images.length, settings?.display_duration, settings?.transition_speed]);
 
   // Fetch schedules
   useEffect(() => {
@@ -93,6 +238,10 @@ export default function PresentationView() {
             (hasDateTag ? hasDateTag[1] === today : true);
         });
         
+        // Get currently active classes
+        const currentlyActive = filteredData?.filter(schedule => isScheduleActive(schedule)) || [];
+        setActiveClasses(currentlyActive);
+        
         // Extract unique grades and teachers for filters
         if (filteredData) {
           // Get unique grades
@@ -124,6 +273,20 @@ export default function PresentationView() {
     const refreshInterval = setInterval(fetchData, 60000);
     return () => clearInterval(refreshInterval);
   }, [currentTime]);
+
+  // Class carousel rotation effect
+  useEffect(() => {
+    if (activeClasses.length <= 1) return; // No need to rotate if there's only one class or none
+    
+    // Use class_duration if available, or default to 10 seconds
+    const classDuration = (settings?.class_duration || 10) * 1000;
+    
+    const intervalId = setInterval(() => {
+      setCurrentClassIndex((prevIndex) => (prevIndex + 1) % activeClasses.length);
+    }, classDuration);
+    
+    return () => clearInterval(intervalId);
+  }, [activeClasses.length, settings?.class_duration]);
 
   const isScheduleActive = (schedule: Schedule): boolean => {
     const now = new Date();
@@ -309,300 +472,312 @@ export default function PresentationView() {
     );
   };
 
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
-        <div className="relative">
-          <div className="w-24 h-24 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin"></div>
-          <div className="w-24 h-24 border-t-4 border-b-4 border-sky-400 rounded-full animate-spin absolute top-0 left-0" style={{ animationDirection: 'reverse', opacity: 0.7 }}></div>
+      <div className="fixed inset-0 bg-black flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-gray-600 border-t-blue-500 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center">
+        <div className="text-red-500 text-xl font-bold mb-4">Error loading presentation</div>
+        <div className="text-white">{error}</div>
+      </div>
+    );
+  }
+
+  // No active content state
+  if (!settings?.active_category_id && !settings?.show_classes && !settings?.show_news) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center">
+        <div className="text-white text-2xl">No active content to display</div>
+        <div className="text-gray-400 mt-2">Configure the presentation in the admin panel</div>
+      </div>
+    );
+  }
+
+  // FULLSCREEN MODE - Image only, maximum impact
+  if (settings?.fullscreen === true) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col">
+        {/* Fullscreen image display */}
+        <div className="flex-1 relative overflow-hidden">
+          {images.length > 1 ? (
+            // Multiple images with fade transition
+            <>
+              {images.map((image, index) => (
+                <div 
+                  key={image.id}
+                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ease-in-out
+                    ${index === currentImageIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  style={{
+                    transitionDuration: '1500ms'
+                  }}
+                >
+                  <img 
+                    src={image.image_url}
+                    alt={`Presentation image ${index + 1}`}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+              ))}
+            </>
+          ) : images.length === 1 ? (
+            // Single image
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img 
+                src={images[0].image_url}
+                alt="Presentation image"
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          ) : (
+            // No images available
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-gray-400 text-2xl">No images available</div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
+  // NON-FULLSCREEN MODE - With date/time header and optional news/classes sections
+  const showSidebar = settings?.show_classes || settings?.show_news;
+  
   return (
-    <div className="h-screen bg-[#0a0a0a] overflow-y-auto relative">
-      {/* Simplified background elements with higher quality blur */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        {/* Primary gradients - fewer elements with higher quality blur */}
-        <div className="absolute top-0 left-0 w-full h-full">
-          {/* Main gradient background */}
-          <div className="absolute top-0 right-0 w-[80%] h-[70%] bg-gradient-to-bl from-blue-600/15 to-transparent rounded-[100%] filter blur-[100px] opacity-60"></div>
-          <div className="absolute bottom-0 left-0 w-[80%] h-[70%] bg-gradient-to-tr from-blue-500/15 to-transparent rounded-[100%] filter blur-[100px] opacity-60"></div>
-          
-          {/* Accent gradients - positioned with less overlap */}
-          <div className="absolute top-[30%] left-[20%] w-[40%] h-[40%] bg-gradient-to-r from-cyan-500/15 to-blue-400/10 rounded-full filter blur-[90px] opacity-70"></div>
-          <div className="absolute bottom-[30%] right-[20%] w-[40%] h-[40%] bg-gradient-to-r from-blue-500/15 to-sky-400/10 rounded-full filter blur-[90px] opacity-70"></div>
+    <div className="fixed inset-0 bg-black flex flex-col">
+      {/* Header with date and time */}
+      <header className="bg-black/80 backdrop-blur-sm border-b border-gray-800 px-8 py-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-extralight text-white tracking-tight">
+            {format(currentTime, 'EEEE')}
+          </h1>
+          <p className="text-lg font-light text-gray-400">
+            {format(currentTime, 'MMMM d, yyyy')}
+          </p>
         </div>
-      </div>
-
-      {/* Content container */}
-      <div className="relative z-10 container mx-auto p-4 lg:p-6 pb-20">
-        {/* Header with time and date */}
-        <header className="mb-6 lg:mb-8">
-          <div className="bg-gray-900/80 rounded-xl p-4 border border-gray-800/50 shadow-lg backdrop-blur-md">
-            <div className="flex flex-row justify-between items-center">
-              <div className="flex items-center gap-4">
-                {/* Continental Logo */}
-                <div className="hidden sm:block">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-sky-400 flex items-center justify-center shadow-lg">
-                    <span className="text-white font-bold text-xl">C</span>
-                  </div>
-                </div>
-                <div>
-                  <h1 className="text-3xl lg:text-4xl font-extralight text-white tracking-tight">
-                    {format(currentTime, 'EEEE')}
-                  </h1>
-                  <p className="text-lg lg:text-xl font-light text-gray-400">
-                    {format(currentTime, 'MMMM d, yyyy')}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <div className="text-4xl lg:text-5xl font-extralight tracking-tighter text-transparent bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text">
-                  {format(currentTime, 'hh:mm')}{' '}
-                  <span className="text-2xl lg:text-3xl text-gray-500">{format(currentTime, 'a')}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Filter dropdown button */}
-        <div className="mb-6 relative">
-          <div className="flex justify-end">
-            <div className="relative">
-              <button
-                onClick={() => setActiveFilter(activeFilter === 'status' ? 'grade' : activeFilter === 'grade' ? 'teacher' : 'status')}
-                className="bg-gray-900/80 rounded-xl px-4 py-2 border border-gray-800/50 shadow-lg backdrop-blur-md flex items-center gap-2 hover:bg-gray-800/60 transition-all"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                <span className="text-gray-300">
-                  {activeFilter === 'status' ? 'Status' : 
-                   activeFilter === 'grade' ? 'Grade' : 'Teacher'}
-                </span>
-              </button>
-            </div>
-          </div>
+        <div className="text-4xl font-extralight tracking-tighter text-transparent bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text">
+          {format(currentTime, 'hh:mm')}{' '}
+          <span className="text-2xl text-gray-500">{format(currentTime, 'a')}</span>
         </div>
-
-        {/* Main content */}
-        <main>
-          {error ? (
-            <div className="bg-gray-900/80 rounded-xl p-4 border border-red-800/50 shadow-lg backdrop-blur-md">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-900/30 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
+      </header>
+      
+      {/* Main content area - flexible layout based on settings */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main content area - Images */}
+        <div className={`flex-1 ${showSidebar ? 'max-w-[65%]' : ''} overflow-hidden relative`}>
+          {images.length > 1 ? (
+            // Multiple images with fade transition
+            <>
+              {images.map((image, index) => (
+                <div 
+                  key={image.id}
+                  className={`absolute inset-0 flex items-center justify-center transition-opacity duration-1000 ease-in-out
+                    ${index === currentImageIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                  style={{
+                    transitionDuration: '1500ms'
+                  }}
+                >
+                  <img 
+                    src={image.image_url}
+                    alt={`Presentation image ${index + 1}`}
+                    className="max-w-full max-h-full object-contain"
+                  />
                 </div>
-                <div>
-                  <h2 className="text-xl font-medium text-red-400">Error Loading Schedule</h2>
-                  <p className="text-base text-gray-400 mt-1">{error}</p>
-                </div>
-              </div>
-            </div>
-          ) : schedules.length === 0 ? (
-            <div className="bg-gray-900/80 rounded-xl p-6 border border-gray-800/50 shadow-lg backdrop-blur-md text-center">
-              <div className="flex flex-col items-center justify-center py-6">
-                <div className="w-16 h-16 rounded-full bg-gray-800/50 flex items-center justify-center mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h2 className="text-2xl font-light text-white mb-2">No Classes Today</h2>
-                <p className="text-base text-gray-400 max-w-2xl">
-                  There are no classes scheduled for today. Check back tomorrow or contact the administration for more information.
-                </p>
-              </div>
+              ))}
+            </>
+          ) : images.length === 1 ? (
+            // Single image
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img 
+                src={images[0].image_url}
+                alt="Presentation image"
+                className="max-w-full max-h-full object-contain"
+              />
             </div>
           ) : (
-            <div className="space-y-8">
-              {activeFilter === 'status' && (
-                <>
-                  {/* Active Classes */}
-                  {schedules.some(s => isScheduleActive(s)) && (
-                    <section className="space-y-4">
-                      <div className="flex items-center gap-3 px-2 mb-2">
-                        <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">In Progress</h2>
-                      </div>
-                      <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                        {schedules
-                          .filter(isScheduleActive)
-                          .map(schedule => (
-                            <ScheduleCard key={schedule.id} schedule={schedule} />
-                          ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* Upcoming Classes */}
-                  {schedules.some(s => isScheduleUpcoming(s)) && (
-                    <section className="space-y-4">
-                      <div className="flex items-center gap-3 px-2 mb-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">Up Next</h2>
-                      </div>
-                      <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                        {schedules
-                          .filter(isScheduleUpcoming)
-                          .sort((a, b) => {
-                            const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                            const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                            return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                          })
-                          .map(schedule => (
-                            <ScheduleCard key={schedule.id} schedule={schedule} />
-                          ))}
-                      </div>
-                    </section>
-                  )}
-
-                  {/* Past Classes */}
-                  {schedules.some(isSchedulePast) && (
-                    <section className="space-y-4">
-                      <div className="flex items-center gap-3 px-2 mb-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-                        <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-gray-400 to-gray-500 bg-clip-text text-transparent">Completed</h2>
-                      </div>
-                      <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                        {schedules
-                          .filter(isSchedulePast)
-                          .sort((a, b) => {
-                            const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                            const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                            return (bHour * 60 + bMinute) - (aHour * 60 + aMinute);
-                          })
-                          .map(schedule => (
-                            <ScheduleCard key={schedule.id} schedule={schedule} />
-                          ))}
-                      </div>
-                    </section>
-                  )}
-                </>
-              )}
-
-              {/* Grade Filter View - Simplified to just sort by grade */}
-              {activeFilter === 'grade' && (
-                <div className="space-y-8">
-                  {uniqueGrades.map(grade => {
-                    const gradeSchedules = schedules.filter(s => s.grade === grade);
-                    if (gradeSchedules.length === 0) return null;
-                    
-                    return (
-                      <section key={grade} className="space-y-4">
-                        <div className="flex items-center gap-3 px-2 mb-2">
-                          <div className="w-3 h-3 rounded-full bg-sky-500"></div>
-                          <h2 className="text-xl lg:text-2xl font-medium bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent">
-                            Grade {grade}
-                          </h2>
-                        </div>
-                        <div className="grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                          {gradeSchedules
-                            .sort((a, b) => {
-                              // Sort by status first (active, upcoming, past), then by time
-                              if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
-                              if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
-                              if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
-                              if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
-                              
-                              // If same status, sort by time
-                              const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                              const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                              return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                            })
-                            .map(schedule => (
-                              <ScheduleCard key={schedule.id} schedule={schedule} />
-                            ))}
-                        </div>
-                      </section>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Teacher Filter View */}
-              {activeFilter === 'teacher' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {uniqueTeachers
-                    .sort((a, b) => {
-                      // Check if teacher has any completed (past) schedules
-                      const aSchedules = schedules.filter(s => s.teacher_id === a.id);
-                      const bSchedules = schedules.filter(s => s.teacher_id === b.id);
-                      
-                      const aHasCompletedSchedules = aSchedules.some(isSchedulePast);
-                      const bHasCompletedSchedules = bSchedules.some(isSchedulePast);
-                      
-                      // Sort teachers with completed schedules to the right
-                      if (aHasCompletedSchedules && !bHasCompletedSchedules) return 1;
-                      if (!aHasCompletedSchedules && bHasCompletedSchedules) return -1;
-                      
-                      // If both have or don't have completed schedules, sort alphabetically by name
-                      return a.name.localeCompare(b.name);
-                    })
-                    .map(teacher => {
-                      const teacherSchedules = schedules.filter(s => s.teacher_id === teacher.id);
-                      if (teacherSchedules.length === 0) return null;
-                      
-                      // Check if this teacher has any completed schedules
-                      const hasCompletedSchedules = teacherSchedules.some(isSchedulePast);
-                      
-                      return (
-                        <div 
-                          key={teacher.id} 
-                          className={`bg-gray-900/80 rounded-xl p-4 border ${
-                            hasCompletedSchedules 
-                              ? 'border-gray-700/40 bg-gradient-to-br from-gray-900/70 to-gray-800/70' 
-                              : 'border-gray-800/40'
-                          } backdrop-blur-md`}
-                        >
-                          <h2 className={`text-xl font-medium mb-4 ${
-                            hasCompletedSchedules 
-                              ? 'text-gray-300' 
-                              : 'text-white'
-                          }`}>
-                            {teacher.name}
-                            {hasCompletedSchedules && (
-                              <span className="ml-2 px-1.5 py-0.5 text-xs rounded-md bg-gray-800/50 text-gray-400 border border-gray-700/30">
-                                Has Completed
-                              </span>
-                            )}
-                          </h2>
-                          <div className="space-y-3">
-                            {teacherSchedules
-                              .sort((a, b) => {
-                                // Sort by status (active, upcoming, past)
-                                if (isScheduleActive(a) && !isScheduleActive(b)) return -1;
-                                if (!isScheduleActive(a) && isScheduleActive(b)) return 1;
-                                if (isScheduleUpcoming(a) && !isScheduleUpcoming(b)) return -1;
-                                if (!isScheduleUpcoming(a) && isScheduleUpcoming(b)) return 1;
-                                
-                                // If same status, sort by time
-                                const [aHour, aMinute] = a.start_time.split(':').map(Number);
-                                const [bHour, bMinute] = b.start_time.split(':').map(Number);
-                                return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
-                              })
-                              .map(schedule => (
-                                <ScheduleCard key={schedule.id} schedule={schedule} />
-                              ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
+            // No images available
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-gray-400 text-2xl">No images available</div>
             </div>
           )}
-        </main>
+        </div>
         
-        {/* Footer */}
-        <footer className="mt-16 text-center text-gray-500 text-lg">
-          <p>Continental Internal • {new Date().getFullYear()}</p>
-        </footer>
+        {/* Side panel for news and classes if enabled */}
+        {showSidebar && (
+          <div className="w-[35%] border-l border-gray-800/50 overflow-y-auto">
+            {/* Current Classes Section */}
+            {settings?.show_classes && activeClasses.length > 0 && (
+              <div className="p-6 border-b border-gray-800/50">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold text-emerald-400">
+                    Current Classes {activeClasses.length > 1 && 
+                      <span className="text-sm text-gray-400 ml-2">({currentClassIndex + 1}/{activeClasses.length})</span>
+                    }
+                  </h2>
+                  {activeClasses.length > 1 && (
+                    <div className="flex space-x-2">
+                      {activeClasses.map((_, index) => (
+                        <div 
+                          key={index} 
+                          className={`w-3 h-3 rounded-full ${index === currentClassIndex ? 'bg-emerald-500' : 'bg-gray-700'}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="relative min-h-[420px]">
+                  {activeClasses.map((schedule, index) => (
+                    <div 
+                      key={schedule.id}
+                      className={`transition-opacity duration-500 absolute inset-0
+                        ${index === currentClassIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                    >
+                      <div 
+                        className="relative rounded-xl p-6 bg-gray-900/90 border border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md overflow-hidden"
+                      >
+                        {/* Status indicator and time */}
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="px-3 py-1.5 rounded-md text-base font-medium bg-emerald-900/40 text-emerald-400 border border-emerald-500/40">
+                            In Progress
+                          </span>
+                          <div className="text-right font-medium">
+                            <span className="text-xl bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
+                              {(() => {
+                                const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
+                                const startDate = new Date();
+                                startDate.setHours(startHour, startMinute);
+                                return format(startDate, 'h:mm');
+                              })()}
+                              <span className="mx-1">-</span>
+                              {(() => {
+                                const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
+                                const endDate = new Date();
+                                endDate.setHours(endHour, endMinute);
+                                return format(endDate, 'h:mm');
+                              })()}
+                            </span>
+                            <span className="text-sm text-gray-400 ml-1">
+                              {(() => {
+                                const [endHour, endMinute] = schedule.end_time.split(':').map(Number);
+                                const endDate = new Date();
+                                endDate.setHours(endHour, endMinute);
+                                return format(endDate, 'a');
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Teacher name and subject as main titles */}
+                        <div className="mb-4">
+                          <div className="flex flex-col">
+                            <h3 className="text-lg text-gray-300 mb-1">
+                              {schedule.teachers?.name}
+                            </h3>
+                            <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
+                              {schedule.subject}
+                            </h2>
+                          </div>
+                        </div>
+                        
+                        {/* Grade and Curriculum information */}
+                        <div className="flex flex-wrap gap-3 mb-3">
+                          <div className="bg-gradient-to-br from-sky-900/40 to-blue-800/20 px-3 py-2 rounded-lg border border-sky-700/30">
+                            <div className="flex items-center">
+                              <span className="text-sky-400 text-sm font-medium mr-2">Grade:</span>
+                              <span className="text-base font-semibold text-white">{schedule.grade}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-gradient-to-br from-blue-900/40 to-cyan-800/20 px-3 py-2 rounded-lg border border-blue-700/30">
+                            <div className="flex items-center">
+                              <span className="text-cyan-400 text-sm font-medium mr-2">Curriculum:</span>
+                              <span className="text-base font-semibold text-white">{schedule.curriculum}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Room information if available */}
+                          {schedule.room && (
+                            <div className="flex items-center px-3 py-2 bg-gradient-to-r from-gray-800/60 to-gray-700/60 rounded-lg border border-gray-700/50">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              <span className="text-base font-medium text-gray-200">Room {schedule.room}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Description - more prominent */}
+                        {schedule.description?.replace(/\nREPEAT$/, '').replace(/\nDATE:[0-9/]+$/, '') && (
+                          <div className="mt-4">
+                            <div className="p-3 bg-gradient-to-br from-gray-900/60 to-gray-800/40 rounded-lg border border-gray-800/70">
+                              <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
+                                {schedule.description?.replace(/\nREPEAT$/, '').replace(/\nDATE:[0-9/]+$/, '')}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Progress bar */}
+                        <div className="mt-5">
+                          <div className="flex justify-between text-xs text-gray-400 mb-1">
+                            <span>Progress</span>
+                            <span>{getClassProgress(schedule)}%</span>
+                          </div>
+                          <div className="w-full h-2 bg-gray-800/70 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-emerald-500 rounded-full"
+                              style={{ width: `${getClassProgress(schedule)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Calendar Events Section */}
+            {settings?.show_classes && events.length > 0 && (
+              <div className="p-4 border-b border-gray-800/50">
+                <h2 className="text-lg font-semibold text-blue-400 mb-4">Today's Events</h2>
+                <div className="space-y-3">
+                  {events.map(event => (
+                    <div key={event.id} className="bg-gray-900/80 p-3 rounded-lg border border-gray-800/50">
+                      <h3 className="text-white font-semibold mb-1">{event.title}</h3>
+                      <p className="text-gray-400 text-sm line-clamp-3">{event.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* News Section */}
+            {settings?.show_news && news.length > 0 && (
+              <div className="p-4">
+                <h2 className="text-lg font-semibold text-purple-400 mb-4">Latest News</h2>
+                <div className="space-y-3">
+                  {news.map(item => (
+                    <div key={item.id} className="bg-gray-900/80 p-3 rounded-lg border border-gray-800/50">
+                      <h3 className="text-white font-semibold mb-1">{item.title}</h3>
+                      <p className="text-gray-400 text-sm line-clamp-3">{item.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
-} 
+};
+
+export default PresentationView; 

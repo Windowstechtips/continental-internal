@@ -983,6 +983,15 @@ export default function TeacherSchedule() {
                         <div className="font-medium">
                           {format(new Date().setHours(hour), 'h a')}
                         </div>
+                        {/* Current time indicator indicator for this cell */}
+                        {isCurrentHour && currentTimePos && (
+                          <div className="absolute -right-1 top-0 bottom-0 w-2">
+                            <div 
+                              className="absolute right-0 w-2 h-2 bg-red-500 rounded-full transform -translate-y-1/2 z-30"
+                              style={{ top: `${currentTimePos.position}%` }}
+                            ></div>
+                          </div>
+                        )}
                       </td>
                       {isMobileView ? (
                         // Mobile view: current day and next day cells
@@ -993,8 +1002,15 @@ export default function TeacherSchedule() {
                           return (
                             <td 
                               key={i} 
-                              className={`border border-gray-700 p-0 ${isToday ? 'bg-blue-900/10' : ''}`}
+                              className={`border border-gray-700 p-0 ${isToday ? 'bg-blue-900/10' : ''} relative`}
                             >
+                              {/* Current time indicator for this cell */}
+                              {isCurrentHour && isToday && currentTimePos && (
+                                <div 
+                                  className="absolute left-0 right-0 h-0.5 bg-red-500 z-30"
+                                  style={{ top: `${currentTimePos.position}%` }}
+                                ></div>
+                              )}
                               {renderScheduleCell(date, hour)}
                             </td>
                           );
@@ -1008,39 +1024,32 @@ export default function TeacherSchedule() {
                           return (
                             <td 
                               key={i} 
-                              className={`border border-gray-700 p-0 ${isToday ? 'bg-blue-900/10' : ''}`}
+                              className={`border border-gray-700 p-0 ${isToday ? 'bg-blue-900/10' : ''} relative`}
                             >
+                              {/* Current time indicator for this cell */}
+                              {isCurrentHour && isToday && currentTimePos && (
+                                <div 
+                                  className="absolute left-0 right-0 h-0.5 bg-red-500 z-30"
+                                  style={{ top: `${currentTimePos.position}%` }}
+                                >
+                                  {/* Time indicator displayed only on today's column */}
+                                  <div 
+                                    className="absolute bg-red-500 px-2 py-1 rounded text-white text-xs font-medium min-w-[72px] text-center whitespace-nowrap flex items-center justify-center"
+                                    style={{
+                                      top: '0',
+                                      right: '8px',
+                                      transform: 'translateY(-50%)'
+                                    }}
+                                  >
+                                    <div className="absolute left-[-4px] top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rotate-45"></div>
+                                    {currentTimePos.formattedTime}
+                                  </div>
+                                </div>
+                              )}
                               {renderScheduleCell(date, hour)}
                             </td>
                           );
                         })
-                      )}
-                      {isCurrentHour && (
-                        <>
-                          {/* Current time line with tab */}
-                          <div className="absolute left-0 right-0 flex items-center z-30">
-                            {/* Horizontal time line */}
-                            <div 
-                              className="absolute left-0 right-0 h-0.5 bg-red-500"
-                              style={{
-                                top: `${currentTimePos.position}%`
-                              }}
-                            >
-                              {/* Time indicator tab placed at the right edge */}
-                              <div 
-                                className="absolute bg-red-500 px-2 py-1 rounded text-white text-xs font-medium min-w-[72px] text-center whitespace-nowrap flex items-center justify-center"
-                                style={{
-                                  top: '0',
-                                  right: '8px',
-                                  transform: 'translateY(-50%)'
-                                }}
-                              >
-                                <div className="absolute left-[-4px] top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rotate-45"></div>
-                                {currentTimePos.formattedTime}
-                              </div>
-                            </div>
-                          </div>
-                        </>
                       )}
                     </tr>
                   );

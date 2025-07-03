@@ -8,12 +8,11 @@ export default function Navbar() {
   const location = useLocation();
 
   const navigation = [
-    { name: 'Teacher Schedule', href: '/teacher-schedule' },
-    { name: 'News', href: 'news' },
-    { name: 'Site Editor', href: 'site-editor' },
-    { name: 'Images', href: 'images' },
-    { name: 'Store', href: 'store' },
-    { name: 'Teachers', href: 'teachers' },
+    { name: 'Dashboard', href: '/dashboard' },
+    { name: 'Teacher Schedule', href: '/dashboard/teacher-schedule' },
+    { name: 'Site Editor', href: '/dashboard/site-editor' },
+    { name: 'Teachers', href: '/dashboard/teachers' },
+    { name: 'Presentation Editor', href: '/dashboard/presentation-editor' },
   ];
 
   // Add scroll effect
@@ -31,8 +30,7 @@ export default function Navbar() {
   }, []);
 
   const isActive = (path: string) => {
-    // Use exact path matching to prevent partial matches
-    return location.pathname === path || location.pathname === `/dashboard/${path}`;
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 
   const handleLogout = () => {
