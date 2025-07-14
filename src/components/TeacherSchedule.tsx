@@ -63,7 +63,7 @@ export default function TeacherSchedule() {
   const tableRef = useRef<HTMLDivElement>(null);
   const [isMobileView, setIsMobileView] = useState(false);
   const [mobileStartDate, setMobileStartDate] = useState(new Date()); // For mobile view dates
-  const [showAllSchedules, setShowAllSchedules] = useState(false); // State for showing all schedules
+  const [showAllSchedules, setShowAllSchedules] = useState(true); // State for showing all schedules, default to true
   
   // New states for scheduling
   const [canSchedule, setCanSchedule] = useState(false);
@@ -209,11 +209,6 @@ export default function TeacherSchedule() {
       if (teachersError) throw teachersError;
       setTeachers(teachersData || []);
 
-      // If no teacher is selected and we have teachers, select the first one
-      if (!selectedTeacher && teachersData && teachersData.length > 0 && !showAllSchedules) {
-        setSelectedTeacher(teachersData[0]);
-      }
-
       // Fetch schedules for the selected teacher or all schedules
       let query = supabase.from('class_schedules').select('*, teachers(*)');
       
@@ -296,6 +291,22 @@ export default function TeacherSchedule() {
     
     // Add a small gap between cells (2px)
     return `calc(${(durationMinutes / 60) * 100}% - 2px)`;
+  };
+
+  // Calculate the top position of a schedule based on its start time minutes
+  const calculateScheduleTop = (startTime: string) => {
+    const [, startMinute] = startTime.split(':').map(Number);
+    return `${(startMinute / 60) * 100}%`;
+  };
+
+  // Calculate schedule duration in minutes
+  const calculateScheduleDuration = (startTime: string, endTime: string) => {
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
+    
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    return endMinutes - startMinutes;
   };
 
   // Calculate the position of the current time line
@@ -669,6 +680,8 @@ export default function TeacherSchedule() {
               now.getMinutes() >= parseInt(schedule.end_time.split(':')[1])));
           
           const isFinished = isPastDay || isFinishedToday;
+          const duration = calculateScheduleDuration(schedule.start_time, schedule.end_time);
+          const isSmallCard = duration <= 30; // 30 minutes or less
           
           return (
             <div
@@ -680,10 +693,10 @@ export default function TeacherSchedule() {
                   : 'bg-gradient-to-br from-blue-600/30 to-indigo-500/20 hover:from-blue-600/40 hover:to-indigo-500/30 border-blue-400/40'
               } border rounded-md p-2 text-xs ${
                 isFinished ? 'text-gray-400' : 'text-gray-200'
-              } shadow-md transition-all duration-200 overflow-hidden cursor-pointer transform hover:scale-[1.02] hover:z-20 group`}
+              } shadow-md transition-all duration-200 cursor-pointer transform hover:scale-[1.02] hover:z-20 group overflow-hidden`}
               style={{
                 height: calculateScheduleHeight(schedule.start_time, schedule.end_time),
-                top: '1px',
+                top: calculateScheduleTop(schedule.start_time),
                 margin: '1px'
               }}
             >
@@ -693,7 +706,7 @@ export default function TeacherSchedule() {
               } rounded-t`}></div>
               
               {/* Edit button - only shown on hover and when user has scheduling rights */}
-              {canSchedule && (
+              {canSchedule && !isSmallCard && (
                 <div 
                   className="absolute top-1 right-1 p-1 rounded-full bg-gray-900/70 opacity-0 group-hover:opacity-100 cursor-pointer transition-all duration-200 hover:bg-blue-600/70 z-10"
                   onClick={(e) => handleEditClick(e, schedule, day)}
@@ -704,56 +717,59 @@ export default function TeacherSchedule() {
               )}
               
               <div className="flex flex-col h-full relative">
-                {/* Decorative circle in background */}
-                {!isFinished && (
-                  <div className="absolute right-0 top-0 w-16 h-16 rounded-full bg-gradient-to-br from-blue-400/10 to-purple-400/5 -mr-8 -mt-8 blur-sm"></div>
-                )}
-                
-                <div>
+                <div className="flex-1 min-h-0 flex flex-col">
                   {/* Subject title with gradient text */}
                   <div className={`font-bold ${
                     isFinished 
                       ? 'text-gray-400' 
                       : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-sky-200'
-                  } text-sm md:text-lg lg:text-xl mb-1 truncate leading-tight`}>{schedule.subject}</div>
-                  
-                  {/* Grade with badge-like style */}
-                  <div className={`inline-block rounded-full px-2 py-0.5 text-xs md:text-sm font-medium ${
-                    isFinished
-                      ? 'bg-gray-700/60 text-gray-400'
-                      : 'bg-blue-500/20 text-blue-100'
-                  } mb-1`}>{schedule.grade}</div>
-                  
-                  {/* Curriculum with subtle styling */}
-                  <div className={`${
-                    isFinished ? 'text-gray-600' : 'text-gray-400'
-                  } text-xs md:text-sm lg:text-base mt-1 font-light italic`}>{schedule.curriculum}</div>
-                  
-                  {/* Time with eye-catching style */}
-                  <div className={`flex items-center mt-2 ${
-                    isFinished ? 'text-gray-500' : 'text-gray-300'
-                  } text-xs md:text-sm lg:text-base font-medium`}>
-                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className={`${isFinished ? '' : 'tracking-wide'}`}>
-                      {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
-                    </span>
+                  } text-[clamp(0.75rem,1.2vw,1rem)] leading-tight break-words ${
+                    isSmallCard ? 'truncate' : ''
+                  }`}>
+                    {schedule.subject}
                   </div>
+                  
+                  {/* Only show additional content if not a small card */}
+                  {!isSmallCard && (
+                    <>
+                      {/* Combined Grade and Curriculum pill */}
+                      <div className={`inline-flex items-center rounded-full px-2 py-0.5 text-[clamp(0.65rem,0.8vw,0.875rem)] font-medium min-w-fit ${
+                        isFinished
+                          ? 'bg-gray-700/60 text-gray-400'
+                          : 'bg-blue-500/20 text-blue-100'
+                      } my-1`}>
+                        <span className="font-medium">{schedule.grade}</span>
+                        <span className="mx-1 opacity-50">•</span>
+                        <span className="font-light italic">{schedule.curriculum}</span>
+                      </div>
+                      
+                      {/* Time with eye-catching style */}
+                      <div className={`flex items-center mt-auto pt-1 ${
+                        isFinished ? 'text-gray-500' : 'text-gray-300'
+                      } text-[clamp(0.65rem,0.8vw,0.875rem)] font-medium whitespace-nowrap`}>
+                        <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className={`${isFinished ? '' : 'tracking-wide'}`}>
+                          {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
+                        </span>
+                      </div>
+
+                      {schedule.room && (
+                        <div className={`flex items-center mt-1 ${
+                          isFinished ? 'text-gray-600' : 'text-gray-400'
+                        } text-[clamp(0.65rem,0.8vw,0.875rem)] whitespace-nowrap`}>
+                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${
+                            isFinished ? 'bg-gray-700' : 'bg-blue-500/30'
+                          } mr-1 flex-shrink-0`}>
+                            <span className="text-[8px]">R</span>
+                          </span>
+                          <span className="break-words">{schedule.room}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-                
-                {schedule.room && (
-                  <div className={`flex items-center mt-2 ${
-                    isFinished ? 'text-gray-600' : 'text-gray-400'
-                  } text-xs md:text-sm`}>
-                    <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${
-                      isFinished ? 'bg-gray-700' : 'bg-blue-500/30'
-                    } mr-1`}>
-                      <span className="text-[8px]">R</span>
-                    </span>
-                    <span>{schedule.room}</span>
-                  </div>
-                )}
               </div>
             </div>
           );
@@ -836,6 +852,7 @@ export default function TeacherSchedule() {
     if (isAuthenticated) {
       window.location.href = '/dashboard';
     } else {
+      // If not authenticated, we assume they came from login page
       window.location.href = '/login';
     }
   };

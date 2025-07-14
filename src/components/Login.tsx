@@ -32,6 +32,7 @@ export default function Login() {
   const handleTeacherSchedule = () => {
     setIsLoading(true);
     setTimeout(() => {
+      localStorage.setItem('isAuthenticated', 'false');
       window.location.href = '/teacher-schedule';
     }, 500);
   };

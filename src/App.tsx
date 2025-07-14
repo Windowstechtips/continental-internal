@@ -43,14 +43,15 @@ export default function App() {
         />
         
         <Route path="/presentation" element={<PresentationView />} />
+        <Route path="/teacher-schedule" element={<TeacherSchedule />} />
 
         {/* Protected routes with shared layout */}
         <Route path="/dashboard" element={<ProtectedLayout />}>
           <Route index element={<Dashboard />} />
-          <Route path="teacher-schedule" element={<TeacherSchedule />} />
           <Route path="site-editor/*" element={<SiteEditor />} />
           <Route path="teachers" element={<Teachers />} />
           <Route path="presentation-editor" element={<PresentationEditor />} />
+          <Route path="teacher-schedule" element={<TeacherSchedule />} />
         </Route>
 
         {/* Redirect all other routes */}

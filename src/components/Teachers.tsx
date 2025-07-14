@@ -19,7 +19,10 @@ interface Teacher {
 interface TeacherWithSubjects {
   id: number;
   name: string;
-  subjects: string[];
+  subjects: Array<{
+    id: number;
+    subject: string;
+  }>;
 }
 
 export default function Teachers() {
@@ -29,7 +32,11 @@ export default function Teachers() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEditTeacherNameModalOpen, setIsEditTeacherNameModalOpen] = useState(false);
+  const [isAddSubjectModalOpen, setIsAddSubjectModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [selectedTeacherName, setSelectedTeacherName] = useState<string>('');
+  const [editMode, setEditMode] = useState<'subject' | 'teacherName'>('subject');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [formData, setFormData] = useState({
@@ -88,24 +95,36 @@ export default function Teachers() {
 
   const handleEditTeacher = async () => {
     try {
-      if (!selectedTeacher) return;
-      if (!formData.name || !formData.subject) {
-        setError('Please fill in all fields');
-        return;
+      if (editMode === 'subject') {
+        if (!selectedTeacher || !formData.subject) {
+          setError('Please fill in the subject field');
+          return;
+        }
+
+        const { error } = await supabase
+          .from('teachers')
+          .update({ subject: formData.subject })
+          .eq('id', selectedTeacher.id);
+
+        if (error) throw error;
+      } else {
+        if (!formData.name || !selectedTeacherName) {
+          setError('Please fill in the teacher name');
+          return;
+        }
+
+        const { error } = await supabase
+          .from('teachers')
+          .update({ name: formData.name })
+          .eq('name', selectedTeacherName);
+
+        if (error) throw error;
       }
 
-      const { error } = await supabase
-        .from('teachers')
-        .update({ 
-          name: formData.name, 
-          subject: formData.subject 
-        })
-        .eq('id', selectedTeacher.id);
-
-      if (error) throw error;
-
       setIsEditModalOpen(false);
+      setIsEditTeacherNameModalOpen(false);
       setSelectedTeacher(null);
+      setSelectedTeacherName('');
       setFormData({ name: '', subject: '' });
       fetchTeachers();
     } catch (error) {
@@ -135,6 +154,7 @@ export default function Teachers() {
   };
 
   const openEditModal = (teacher: Teacher) => {
+    setEditMode('subject');
     setSelectedTeacher(teacher);
     setFormData({
       name: teacher.name,
@@ -143,9 +163,51 @@ export default function Teachers() {
     setIsEditModalOpen(true);
   };
 
+  const openEditTeacherNameModal = (teacherName: string) => {
+    setEditMode('teacherName');
+    setSelectedTeacherName(teacherName);
+    setFormData({
+      name: teacherName,
+      subject: ''
+    });
+    setIsEditTeacherNameModalOpen(true);
+  };
+
   const openDeleteModal = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
     setIsDeleteModalOpen(true);
+  };
+
+  const handleAddSubject = async () => {
+    try {
+      if (!formData.subject) {
+        setError('Please enter a subject');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('teachers')
+        .insert([{ 
+          name: selectedTeacherName, 
+          subject: formData.subject 
+        }]);
+
+      if (error) throw error;
+
+      setIsAddSubjectModalOpen(false);
+      setSelectedTeacherName('');
+      setFormData({ name: '', subject: '' });
+      fetchTeachers();
+    } catch (error) {
+      console.error('Error adding subject:', error);
+      setError('Failed to add subject. Please try again.');
+    }
+  };
+
+  const openAddSubjectModal = (teacherName: string) => {
+    setSelectedTeacherName(teacherName);
+    setFormData({ name: teacherName, subject: '' });
+    setIsAddSubjectModalOpen(true);
   };
 
   // Group teachers by name
@@ -154,14 +216,18 @@ export default function Teachers() {
     
     teachers.forEach(teacher => {
       if (groupedTeachers[teacher.name]) {
-        if (!groupedTeachers[teacher.name].subjects.includes(teacher.subject)) {
-          groupedTeachers[teacher.name].subjects.push(teacher.subject);
-        }
+        groupedTeachers[teacher.name].subjects.push({
+          id: teacher.id,
+          subject: teacher.subject
+        });
       } else {
         groupedTeachers[teacher.name] = {
           id: teacher.id,
           name: teacher.name,
-          subjects: [teacher.subject]
+          subjects: [{
+            id: teacher.id,
+            subject: teacher.subject
+          }]
         };
       }
     });
@@ -176,7 +242,7 @@ export default function Teachers() {
     const query = searchQuery.toLowerCase();
     return (
       teacher.name.toLowerCase().includes(query) ||
-      teacher.subjects.some(subject => subject.toLowerCase().includes(query))
+      teacher.subjects.some(subject => subject.subject.toLowerCase().includes(query))
     );
   });
 
@@ -257,40 +323,55 @@ export default function Teachers() {
                 >
                   <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 px-4 py-3 border-b border-gray-700/50 flex justify-between items-center">
                     <h3 className="font-medium text-white truncate">{teacher.name}</h3>
-                    <div className="flex space-x-1">
-                      <button
-                        onClick={() => {
-                          // Find the first entry for this teacher to edit
-                          const teacherToEdit = teachers.find(t => t.name === teacher.name);
-                          if (teacherToEdit) openEditModal(teacherToEdit);
-                        }}
-                        className="p-1 text-gray-300 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"
-                        title="Edit Teacher"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Find the first entry for this teacher to delete
-                          const teacherToDelete = teachers.find(t => t.name === teacher.name);
-                          if (teacherToDelete) openDeleteModal(teacherToDelete);
-                        }}
-                        className="p-1 text-gray-300 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
-                        title="Delete Teacher"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => openEditTeacherNameModal(teacher.name)}
+                      className="p-1 text-gray-300 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"
+                      title="Edit Teacher Name"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
                   </div>
                   <div className="p-4">
-                    <h4 className="text-sm font-medium text-gray-400 mb-2 flex items-center">
-                      <BookOpenIcon className="h-4 w-4 mr-1 text-blue-500" />
-                      Subjects
-                    </h4>
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium text-gray-400 flex items-center">
+                        <BookOpenIcon className="h-4 w-4 mr-1 text-blue-500" />
+                        Subjects
+                      </h4>
+                      <button
+                        onClick={() => openAddSubjectModal(teacher.name)}
+                        className="p-1.5 text-gray-300 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors flex items-center text-sm"
+                        title="Add Subject"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-1" />
+                        Add Subject
+                      </button>
+                    </div>
                     <div className="space-y-2">
-                      {teacher.subjects.map((subject, idx) => (
-                        <div key={idx} className="bg-gray-700/40 border border-gray-600/30 rounded-lg px-3 py-2 text-sm text-gray-300">
-                          {subject}
+                      {teacher.subjects.map((subject) => (
+                        <div key={subject.id} className="bg-gray-700/40 border border-gray-600/30 rounded-lg px-3 py-2 text-sm text-gray-300 flex justify-between items-center">
+                          <span>{subject.subject}</span>
+                          <div className="flex space-x-1">
+                            <button
+                              onClick={() => {
+                                const teacherToEdit = teachers.find(t => t.id === subject.id);
+                                if (teacherToEdit) openEditModal(teacherToEdit);
+                              }}
+                              className="p-1 text-gray-300 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"
+                              title="Edit Subject"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const teacherToDelete = teachers.find(t => t.id === subject.id);
+                                if (teacherToDelete) openDeleteModal(teacherToDelete);
+                              }}
+                              className="p-1 text-gray-300 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                              title="Delete Subject"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -364,7 +445,7 @@ export default function Teachers() {
         </div>
       )}
       
-      {/* Edit Teacher Modal */}
+      {/* Edit Teacher Modal (for subjects) */}
       {isEditModalOpen && selectedTeacher && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsEditModalOpen(false)}>
           <div 
@@ -374,7 +455,7 @@ export default function Teachers() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
               <div className="relative p-5 flex justify-between items-center">
-                <h3 className="text-xl font-bold text-white">Edit Teacher</h3>
+                <h3 className="text-xl font-bold text-white">Edit Subject</h3>
                 <button 
                   onClick={() => setIsEditModalOpen(false)}
                   className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
@@ -389,10 +470,9 @@ export default function Teachers() {
                 <label className="block text-sm font-medium text-gray-400 mb-1">Teacher Name</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  placeholder="Enter teacher name"
+                  value={selectedTeacher.name}
+                  disabled
+                  className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-400 cursor-not-allowed"
                 />
               </div>
               
@@ -425,6 +505,73 @@ export default function Teachers() {
           </div>
         </div>
       )}
+
+      {/* Edit Teacher Name Modal */}
+      {isEditTeacherNameModalOpen && selectedTeacherName && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsEditTeacherNameModalOpen(false)}>
+          <div 
+            className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
+              <div className="relative p-5 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white">Edit Teacher Name</h3>
+                <button 
+                  onClick={() => setIsEditTeacherNameModalOpen(false)}
+                  className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Current Name</label>
+                <input
+                  type="text"
+                  value={selectedTeacherName}
+                  disabled
+                  className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-400 cursor-not-allowed"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">New Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData({...formData, name: e.target.value})}
+                  className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  placeholder="Enter new teacher name"
+                />
+              </div>
+
+              <div className="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg text-sm text-blue-200">
+                <p>
+                  This will update the teacher's name for all their subjects ({teachers.filter(t => t.name === selectedTeacherName).length} entries).
+                </p>
+              </div>
+            </div>
+            
+            <div className="border-t border-gray-800 p-4 flex justify-end space-x-3">
+              <button 
+                onClick={() => setIsEditTeacherNameModalOpen(false)}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleEditTeacher}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+              >
+                Update Name
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && selectedTeacher && (
@@ -436,7 +583,7 @@ export default function Teachers() {
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-red-400 opacity-90"></div>
               <div className="relative p-5 flex justify-between items-center">
-                <h3 className="text-xl font-bold text-white">Delete Teacher</h3>
+                <h3 className="text-xl font-bold text-white">Delete Subject</h3>
                 <button 
                   onClick={() => setIsDeleteModalOpen(false)}
                   className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
@@ -448,16 +595,12 @@ export default function Teachers() {
             
             <div className="p-5 space-y-4">
               <p className="text-gray-300">
-                Are you sure you want to delete <span className="text-white font-medium">{selectedTeacher.name}</span> 
-                {teachers.filter(t => t.name === selectedTeacher.name).length > 1 
-                  ? ` and all their subjects? This will remove ${teachers.filter(t => t.name === selectedTeacher.name).length} entries.`
-                  : ` (subject: ${selectedTeacher.subject})?`
-                }
+                Are you sure you want to delete the subject <span className="text-white font-medium">{selectedTeacher.subject}</span> for teacher <span className="text-white font-medium">{selectedTeacher.name}</span>?
               </p>
               
               <div className="p-3 bg-red-900/20 border border-red-800/30 rounded-lg text-sm text-red-200">
                 <p>
-                  This action cannot be undone. Any classes assigned to this teacher will need to be reassigned.
+                  This action cannot be undone. Any classes assigned to this teacher for this subject will need to be reassigned.
                 </p>
               </div>
             </div>
@@ -473,7 +616,68 @@ export default function Teachers() {
                 onClick={handleDeleteTeacher}
                 className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
               >
-                Delete Teacher
+                Delete Subject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Subject Modal */}
+      {isAddSubjectModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsAddSubjectModalOpen(false)}>
+          <div 
+            className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
+              <div className="relative p-5 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-white">Add New Subject</h3>
+                <button 
+                  onClick={() => setIsAddSubjectModalOpen(false)}
+                  className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Teacher Name</label>
+                <input
+                  type="text"
+                  value={selectedTeacherName}
+                  disabled
+                  className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-400 cursor-not-allowed"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                <input
+                  type="text"
+                  value={formData.subject}
+                  onChange={e => setFormData({...formData, subject: e.target.value})}
+                  className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  placeholder="Enter new subject"
+                />
+              </div>
+            </div>
+            
+            <div className="border-t border-gray-800 p-4 flex justify-end space-x-3">
+              <button 
+                onClick={() => setIsAddSubjectModalOpen(false)}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleAddSubject}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+              >
+                Add Subject
               </button>
             </div>
           </div>
