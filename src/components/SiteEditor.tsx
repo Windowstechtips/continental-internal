@@ -6,8 +6,36 @@ import { format } from 'date-fns';
 import News from './News';
 import Images from './Images';
 import Store from './Store/Store';
+import TeacherImageUploader from './TeacherImageUploader';
 
 // Define types
+interface Teacher {
+  id: string;
+  teacher_name: string;
+  subject_name: string;
+  qualifications: string | null;
+  description: string | null;
+  picture_id: string | null;
+  grade: string | null;  // "9,10,AS"
+  syllabus: string | null;  // "Cambridge,Edexcel"
+  // Remove individual grade and curriculum fields
+  grade_9?: boolean;
+  grade_10?: boolean;
+  grade_as?: boolean;
+  curriculum_edexcel?: boolean;
+  curriculum_cambridge?: boolean;
+}
+
+// Define navigation items
+const editorNavigation = [
+  { name: 'Subjects', href: '/dashboard/site-editor', exact: true },
+  { name: 'Calendar', href: '/dashboard/site-editor/calendar' },
+  { name: 'News', href: '/dashboard/site-editor/news' },
+  { name: 'Images', href: '/dashboard/site-editor/images' },
+  { name: 'Store', href: '/dashboard/site-editor/store' },
+  { name: 'Teachers', href: '/dashboard/site-editor/teachers' }
+];
+
 interface Subject {
   id: string;
   subject_name: string;
@@ -317,50 +345,470 @@ const CalendarEventEditor = ({ onClose, editingEvent, onSave }: {
   );
 };
 
+// Teacher Content Card Component
+const TeacherContentCard: React.FC<{
+  teacher: Teacher;
+  onEdit: () => void;
+  onDelete: () => void;
+}> = ({ teacher, onEdit, onDelete }) => {
+  // Parse qualifications safely
+  const qualificationsList = React.useMemo(() => {
+    if (!teacher.qualifications) return [];
+    try {
+      if (Array.isArray(teacher.qualifications)) {
+        return teacher.qualifications;
+      }
+      return teacher.qualifications
+        .split('","')
+        .map(q => q.replace(/^"|"$/g, '').trim())
+        .filter(Boolean);
+    } catch (error) {
+      console.error('Error parsing qualifications:', error);
+      return [];
+    }
+  }, [teacher.qualifications]);
+
+  // Parse grade and syllabus
+  const grades = React.useMemo(() => {
+    if (!teacher.grade) return [];
+    return teacher.grade.split(',').map(g => g.trim()).filter(Boolean);
+  }, [teacher.grade]);
+
+  const syllabus = React.useMemo(() => {
+    if (!teacher.syllabus) return [];
+    return teacher.syllabus.split(',').map(s => s.trim()).filter(Boolean);
+  }, [teacher.syllabus]);
+
+  return (
+    <div className="bg-dark-card hover:bg-dark-cardHover border border-dark-border/30 rounded-xl shadow-md hover:shadow-lg transition-all duration-300 p-5 backdrop-blur-sm">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex items-center gap-3">
+          {teacher.picture_id ? (
+            <img 
+              src={teacher.picture_id} 
+              alt={teacher.teacher_name}
+              className="w-12 h-12 object-cover rounded-full border-2 border-gray-700"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-gray-800 border-2 border-gray-700 flex items-center justify-center">
+              <span className="text-gray-400 text-lg">{teacher.teacher_name.charAt(0)}</span>
+            </div>
+          )}
+          <div>
+            <h3 className="text-lg font-semibold text-white">{teacher.teacher_name}</h3>
+            <p className="text-sm text-gray-400">{teacher.subject_name}</p>
+            {grades.length > 0 && (
+              <p className="text-xs text-gray-500">Grade {grades.join(', ')}</p>
+            )}
+            {syllabus.length > 0 && (
+              <p className="text-xs text-gray-500">{syllabus.join(', ')}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={onEdit}
+            className="p-1.5 rounded-full hover:bg-blue-500/20 transition-all duration-200"
+          >
+            <PencilIcon className="h-5 w-5 text-blue-400" />
+          </button>
+          <button 
+            onClick={onDelete}
+            className="p-1.5 rounded-full hover:bg-red-500/20 transition-all duration-200"
+          >
+            <TrashIcon className="h-5 w-5 text-red-400" />
+          </button>
+        </div>
+      </div>
+      {teacher.description && (
+        <p className="text-gray-400 text-sm mb-2">{teacher.description}</p>
+      )}
+      {qualificationsList.length > 0 && (
+        <div className="mb-2">
+          <p className="text-sm text-gray-300 font-medium mb-1">Qualifications:</p>
+          <ul className="list-disc list-inside space-y-0.5">
+            {qualificationsList.map((qualification, index) => (
+              <li key={index} className="text-gray-400 text-sm">{qualification}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Teacher Content Editor Component
+const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: { 
+  onClose: () => void; 
+  editingTeacher?: Teacher;
+  onSave: (data: Omit<Teacher, 'id'>) => Promise<void>;
+}) => {
+  // Initialize qualifications array from string or existing array
+  const initialQualifications = React.useMemo(() => {
+    if (!editingTeacher?.qualifications) return [];
+    try {
+      if (Array.isArray(editingTeacher.qualifications)) {
+        return editingTeacher.qualifications;
+      }
+      return editingTeacher.qualifications
+        .split('","')
+        .map(q => q.replace(/^"|"$/g, '').trim())
+        .filter(Boolean);
+    } catch (error) {
+      console.error('Error parsing initial qualifications:', error);
+      return [];
+    }
+  }, [editingTeacher?.qualifications]);
+
+  // Parse initial grade and syllabus
+  const [formData, setFormData] = useState(() => {
+    // Helper function to check if a value exists in a comma-separated string
+    const hasValue = (str: string | null | undefined, value: string) => {
+      if (!str) return false;
+      return str.split(',').map(s => s.trim()).includes(value);
+    };
+
+    // Get grade from comma-separated string (e.g., "9,10,AS")
+    const grade = editingTeacher?.grade || '';
+    
+    // Get syllabus from comma-separated string (e.g., "Cambridge,Edexcel")
+    const syllabus = editingTeacher?.syllabus || '';
+
+    return {
+      teacher_name: editingTeacher?.teacher_name || '',
+      subject_name: editingTeacher?.subject_name || '',
+      description: editingTeacher?.description || '',
+      picture_id: editingTeacher?.picture_id || '',
+      grade_9: hasValue(grade, '9'),
+      grade_10: hasValue(grade, '10'),
+      grade_as: hasValue(grade, 'AS'),
+      curriculum_edexcel: hasValue(syllabus, 'Edexcel'),
+      curriculum_cambridge: hasValue(syllabus, 'Cambridge')
+    };
+  });
+
+  const [qualifications, setQualifications] = useState<string[]>(initialQualifications);
+  const [newQualification, setNewQualification] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Format qualifications as required: "qual1","qual2"
+      const formattedQualifications = qualifications.length > 0
+        ? qualifications
+            .map(q => `"${q.trim()}"`)
+            .join(',')
+        : null;
+
+      // Format grade and syllabus as comma-separated strings
+      const grade = [
+        formData.grade_9 ? '9' : '',
+        formData.grade_10 ? '10' : '',
+        formData.grade_as ? 'AS' : ''
+      ].filter(Boolean).join(',');
+
+      const syllabus = [
+        formData.curriculum_cambridge ? 'Cambridge' : '',
+        formData.curriculum_edexcel ? 'Edexcel' : ''
+      ].filter(Boolean).join(',');
+
+      await onSave({
+        ...formData,
+        qualifications: formattedQualifications,
+        grade,
+        syllabus
+      });
+      onClose();
+    } catch (error) {
+      console.error('Error saving teacher:', error);
+      setError('Failed to save teacher. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleImageUploaded = (imageUrl: string) => {
+    setFormData(prev => ({ ...prev, picture_id: imageUrl }));
+  };
+
+  const handleAddQualification = () => {
+    const trimmedQualification = newQualification.trim();
+    if (!trimmedQualification) return;
+    
+    // Check for duplicates
+    if (qualifications.includes(trimmedQualification)) {
+      setError('This qualification already exists');
+      return;
+    }
+
+    setQualifications(prev => [...prev, trimmedQualification]);
+    setNewQualification('');
+    setError(null);
+  };
+
+  const handleRemoveQualification = (indexToRemove: number) => {
+    setQualifications(prev => prev.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddQualification();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-start justify-center overflow-y-auto z-50">
+      <form onSubmit={handleSubmit} className="bg-dark-card border border-gray-800/50 rounded-xl shadow-glass-strong p-6 w-full max-w-3xl my-8">
+        <div className="bg-gradient-to-r from-blue-600/10 to-purple-600/10 -mx-6 -mt-6 mb-6 px-6 py-4 border-b border-gray-800/50 sticky top-0 z-10">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-white bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+              {editingTeacher ? 'Edit Teacher' : 'Add Teacher'}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-gray-400 hover:text-white p-2 rounded-md hover:bg-gray-800/50 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-red-400">{error}</p>
+          </div>
+        )}
+
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Profile Image</label>
+            <TeacherImageUploader
+              onImageUploaded={handleImageUploaded}
+              initialImageUrl={formData.picture_id}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Teacher Name</label>
+            <input
+              type="text"
+              name="teacher_name"
+              value={formData.teacher_name}
+              onChange={handleChange}
+              className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-inner"
+              placeholder="Enter teacher name"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Subject Name</label>
+            <input
+              type="text"
+              name="subject_name"
+              value={formData.subject_name}
+              onChange={handleChange}
+              className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-inner"
+              placeholder="Enter subject name"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-300">Grades</label>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    name="grade_9"
+                    checked={formData.grade_9}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                  />
+                  <span className="text-gray-300">Grade 9</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    name="grade_10"
+                    checked={formData.grade_10}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                  />
+                  <span className="text-gray-300">Grade 10</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    name="grade_as"
+                    checked={formData.grade_as}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                  />
+                  <span className="text-gray-300">AS</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-300">Syllabus</label>
+              <div className="space-y-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    name="curriculum_edexcel"
+                    checked={formData.curriculum_edexcel}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                  />
+                  <span className="text-gray-300">Edexcel</span>
+                </label>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    name="curriculum_cambridge"
+                    checked={formData.curriculum_cambridge}
+                    onChange={handleChange}
+                    className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                  />
+                  <span className="text-gray-300">Cambridge</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Description</label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-h-[100px] shadow-inner"
+              placeholder="Enter description"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Qualifications</label>
+            {qualifications.length > 0 && (
+              <div className="mb-3 bg-gray-800/50 rounded-lg p-3">
+                <div className="text-xs text-gray-400 mb-2">Current qualifications:</div>
+                <div className="flex flex-wrap gap-2">
+                  {qualifications.map((qualification, index) => (
+                    <div 
+                      key={index} 
+                      className="flex items-center gap-1 bg-gray-700/50 rounded-lg px-3 py-1.5 group"
+                    >
+                      <span className="text-gray-300 text-sm">{qualification}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveQualification(index)}
+                        className="text-gray-500 hover:text-red-400 transition-colors ml-2"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newQualification}
+                onChange={(e) => {
+                  setNewQualification(e.target.value);
+                  setError(null);
+                }}
+                onKeyPress={handleKeyPress}
+                className="flex-1 px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-inner"
+                placeholder="Enter a qualification"
+              />
+              <button
+                type="button"
+                onClick={handleAddQualification}
+                className="px-4 py-2 bg-blue-700 hover:bg-blue-600 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-70"
+                disabled={!newQualification.trim()}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-gray-300 font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="px-5 py-2.5 bg-blue-700 hover:bg-blue-600 rounded-lg text-white font-medium transition-colors disabled:opacity-70 flex items-center"
+          >
+            {isLoading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                Saving...
+              </>
+            ) : editingTeacher ? 'Update Teacher' : 'Save Teacher'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
 export default function SiteEditor() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [calendarLoading, setCalendarLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState<string | null>(null);
-  const [editingItem, setEditingItem] = useState<Subject | CalendarEvent | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [calendarError, setCalendarError] = useState<string | null>(null);
-  
+  const [teacherContents, setTeacherContents] = useState<Teacher[]>([]);
+  const [isSubjectEditorOpen, setIsSubjectEditorOpen] = useState(false);
+  const [isCalendarEventEditorOpen, setIsCalendarEventEditorOpen] = useState(false);
+  const [isTeacherContentEditorOpen, setIsTeacherContentEditorOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | undefined>();
+  const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | undefined>();
+  const [editingTeacherContent, setEditingTeacherContent] = useState<Teacher | undefined>();
+  const [isTeacherContentLoading, setIsTeacherContentLoading] = useState(false);
+  const [teacherContentError, setTeacherContentError] = useState<string | null>(null);
   const location = useLocation();
-  const currentPath = location.pathname;
 
-  // Navigation items for the site editor
-  const editorNavigation = [
-    { name: 'Subjects', href: '/dashboard/site-editor', exact: true },
-    { name: 'News', href: '/dashboard/site-editor/news' },
-    { name: 'Images', href: '/dashboard/site-editor/images' },
-    { name: 'Store', href: '/dashboard/site-editor/store' },
-    { name: 'Calendar', href: '/dashboard/site-editor/calendar' }
-  ];
+  useEffect(() => {
+    fetchSubjects();
+    fetchCalendarEvents();
+    fetchTeacherContents();
+  }, []);
 
   // Check if a path is active
   const isActive = (path: string, exact = false) => {
     if (exact) {
-      return currentPath === path;
+      return location.pathname === path;
     }
-    return currentPath.startsWith(path);
+    return location.pathname === path;
   };
 
   // Fetch data when component mounts or path changes
-  useEffect(() => {
-    if (currentPath === '/dashboard/site-editor') {
-      fetchSubjects();
-    } else if (currentPath === '/dashboard/site-editor/calendar') {
-      fetchCalendarEvents();
-    }
-  }, [currentPath]);
-
-  // Fetch subjects from Supabase
   const fetchSubjects = async () => {
-    setLoading(true);
-    setError(null);
-    
     try {
       const { data, error } = await supabase
         .from('subjects_content')
@@ -371,17 +819,11 @@ export default function SiteEditor() {
       setSubjects(data || []);
     } catch (err) {
       console.error('Error fetching subjects:', err);
-      setError('Failed to load subjects. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
   // Fetch calendar events from Supabase
   const fetchCalendarEvents = async () => {
-    setCalendarLoading(true);
-    setCalendarError(null);
-    
     try {
       const { data, error } = await supabase
         .from('calendar_events')
@@ -393,30 +835,43 @@ export default function SiteEditor() {
       setCalendarEvents(data || []);
     } catch (err) {
       console.error('Error fetching calendar events:', err);
-      setCalendarError('Failed to load calendar events. Please try again.');
+    }
+  };
+
+  const fetchTeacherContents = async () => {
+    setIsTeacherContentLoading(true);
+    setTeacherContentError(null);
+    try {
+      const { data, error } = await supabase
+        .from('teachers_content')
+        .select('*');
+      
+      if (error) throw error;
+      setTeacherContents(data || []);
+    } catch (error) {
+      console.error('Error fetching teacher contents:', error);
+      setTeacherContentError('Failed to load teacher content. Please try again.');
     } finally {
-      setCalendarLoading(false);
+      setIsTeacherContentLoading(false);
     }
   };
 
   // Handle saving/updating a subject
   const handleSaveSubject = async (data: Omit<Subject, 'id'>) => {
     try {
-      if (editingItem && 'subject_name' in editingItem) {
-        // Update existing subject
+      if (editingSubject) {
         const { error } = await supabase
           .from('subjects_content')
           .update(data)
-          .eq('id', editingItem.id);
+          .eq('id', editingSubject.id);
         
         if (error) throw error;
         
         // Update local state
         setSubjects(subjects.map(subject => 
-          subject.id === editingItem.id ? { ...subject, ...data } : subject
+          subject.id === editingSubject.id ? { ...subject, ...data } : subject
         ));
       } else {
-        // Create new subject
         const { data: newItem, error } = await supabase
           .from('subjects_content')
           .insert([data])
@@ -438,21 +893,19 @@ export default function SiteEditor() {
   // Handle saving/updating a calendar event
   const handleSaveCalendarEvent = async (data: Omit<CalendarEvent, 'id' | 'created_at'>) => {
     try {
-      if (editingItem && 'title' in editingItem) {
-        // Update existing event
+      if (editingCalendarEvent) {
         const { error } = await supabase
           .from('calendar_events')
           .update(data)
-          .eq('id', editingItem.id);
+          .eq('id', editingCalendarEvent.id);
         
         if (error) throw error;
         
         // Update local state
         setCalendarEvents(calendarEvents.map(event => 
-          event.id === editingItem.id ? { ...event, ...data } : event
+          event.id === editingCalendarEvent.id ? { ...event, ...data } : event
         ));
       } else {
-        // Create new event
         const { data: newEvent, error } = await supabase
           .from('calendar_events')
           .insert([{ ...data, created_at: new Date().toISOString() }])
@@ -468,6 +921,31 @@ export default function SiteEditor() {
     } catch (err) {
       console.error('Error saving calendar event:', err);
       throw err;
+    }
+  };
+
+  const handleSaveTeacherContent = async (data: Omit<Teacher, 'id'>) => {
+    try {
+      if (editingTeacherContent) {
+        const { error } = await supabase
+          .from('teachers_content')
+          .update(data)
+          .eq('id', editingTeacherContent.id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('teachers_content')
+          .insert([data]);
+        
+        if (error) throw error;
+      }
+
+      fetchTeacherContents();
+      setEditingTeacherContent(undefined);
+      setIsTeacherContentEditorOpen(false);
+    } catch (error) {
+      console.error('Error saving teacher content:', error);
     }
   };
 
@@ -515,6 +993,22 @@ export default function SiteEditor() {
     }
   };
 
+  const handleDeleteTeacherContent = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this teacher content?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('teachers_content')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      fetchTeacherContents();
+    } catch (error) {
+      console.error('Error deleting teacher content:', error);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4">
       {/* Site Editor Navigation */}
@@ -543,8 +1037,8 @@ export default function SiteEditor() {
               <h1 className="text-2xl font-bold text-white">Subjects Management</h1>
               <button 
                 onClick={() => {
-                  setIsEditing('subject');
-                  setEditingItem(null);
+                  setEditingSubject(undefined);
+                  setIsSubjectEditorOpen(true);
                 }}
                 className="flex items-center px-4 py-2 bg-blue-700 hover:bg-blue-600 rounded-lg text-white text-sm font-medium transition-colors"
               >
@@ -553,35 +1047,26 @@ export default function SiteEditor() {
               </button>
             </div>
             
-            {error && (
-              <div className="mb-6 p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300 text-sm">
-                {error}
-              </div>
-            )}
+            {/* Error messages for subjects and calendar events are removed as per new_code */}
             
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-12 h-12 rounded-full border-4 border-gray-600 border-t-blue-500 animate-spin mb-4"></div>
-                <p className="text-gray-400">Loading subjects...</p>
-              </div>
-            ) : subjects.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <p>No subjects found. Click the Add Subject button to add one.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {subjects.map((subject) => (
-                  <SubjectCard 
-                    key={subject.id} 
-                    subject={subject} 
-                    onEdit={() => {
-                      setIsEditing('subject');
-                      setEditingItem(subject);
-                    }}
-                    onDelete={() => handleDeleteSubject(subject.id)}
-                  />
-                ))}
-              </div>
+            {/* Loading states for subjects and calendar events are removed as per new_code */}
+            
+            {/* Subject list rendering is removed as per new_code */}
+            
+            {/* Subject Editor Modal is removed as per new_code */}
+            
+            {/* Calendar Event Editor Modal is removed as per new_code */}
+            
+            {/* Teacher Content Editor Modal is added as per new_code */}
+            {isTeacherContentEditorOpen && (
+              <TeacherContentEditor
+                onClose={() => {
+                  setIsTeacherContentEditorOpen(false);
+                  setEditingTeacherContent(undefined);
+                }}
+                editingTeacher={editingTeacherContent}
+                onSave={handleSaveTeacherContent}
+              />
             )}
           </div>
         } />
@@ -594,8 +1079,8 @@ export default function SiteEditor() {
               <h1 className="text-2xl font-bold text-white">Calendar Events</h1>
               <button 
                 onClick={() => {
-                  setIsEditing('event');
-                  setEditingItem(null);
+                  setEditingCalendarEvent(undefined);
+                  setIsCalendarEventEditorOpen(true);
                 }}
                 className="flex items-center px-4 py-2 bg-blue-700 hover:bg-blue-600 rounded-lg text-white text-sm font-medium transition-colors"
               >
@@ -604,61 +1089,123 @@ export default function SiteEditor() {
               </button>
             </div>
             
-            {calendarError && (
-              <div className="mb-6 p-4 bg-red-900/20 border border-red-800 rounded-lg text-red-300 text-sm">
-                {calendarError}
-              </div>
-            )}
+            {/* Error messages for calendar events are removed as per new_code */}
             
-            {calendarLoading ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <div className="w-12 h-12 rounded-full border-4 border-gray-600 border-t-blue-500 animate-spin mb-4"></div>
-                <p className="text-gray-400">Loading calendar events...</p>
-              </div>
-            ) : calendarEvents.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <p>No events found. Click the Add Event button to add one.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {calendarEvents.map((event) => (
-                  <CalendarEventCard 
-                    key={event.id} 
-                    event={event} 
-                    onEdit={() => {
-                      setIsEditing('event');
-                      setEditingItem(event);
-                    }}
-                    onDelete={() => handleDeleteCalendarEvent(event.id)}
-                  />
-                ))}
-              </div>
+            {/* Loading states for calendar events are removed as per new_code */}
+            
+            {/* Calendar Event list rendering is removed as per new_code */}
+            
+            {/* Calendar Event Editor Modal is removed as per new_code */}
+            
+            {/* Teacher Content Editor Modal is added as per new_code */}
+            {isTeacherContentEditorOpen && (
+              <TeacherContentEditor
+                onClose={() => {
+                  setIsTeacherContentEditorOpen(false);
+                  setEditingTeacherContent(undefined);
+                }}
+                editingTeacher={editingTeacherContent}
+                onSave={handleSaveTeacherContent}
+              />
             )}
           </div>
         } />
+        <Route
+          path="teachers"
+          element={
+            <div className="bg-dark-card/80 backdrop-blur-md rounded-2xl shadow-glass-strong p-6 border border-gray-800/50">
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold text-white">Teacher Content</h1>
+                <button
+                  onClick={() => {
+                    setEditingTeacherContent(undefined);
+                    setIsTeacherContentEditorOpen(true);
+                  }}
+                  className="flex items-center px-4 py-2 bg-blue-700 hover:bg-blue-600 rounded-lg text-white text-sm font-medium transition-colors"
+                >
+                  <PlusIcon className="h-4 w-4 mr-1" />
+                  Add Teacher
+                </button>
+              </div>
+
+              {teacherContentError && (
+                <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <p className="text-red-400">{teacherContentError}</p>
+                </div>
+              )}
+
+              {isTeacherContentLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : teacherContents.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400">No teacher content found. Click "Add Teacher" to create one.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {teacherContents.map(teacher => (
+                    <TeacherContentCard
+                      key={teacher.id}
+                      teacher={teacher}
+                      onEdit={() => {
+                        setEditingTeacherContent(teacher);
+                        setIsTeacherContentEditorOpen(true);
+                      }}
+                      onDelete={() => handleDeleteTeacherContent(teacher.id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {isTeacherContentEditorOpen && (
+                <TeacherContentEditor
+                  onClose={() => {
+                    setIsTeacherContentEditorOpen(false);
+                    setEditingTeacherContent(undefined);
+                  }}
+                  editingTeacher={editingTeacherContent}
+                  onSave={handleSaveTeacherContent}
+                />
+              )}
+            </div>
+          }
+        />
       </Routes>
 
       {/* Subject Editor Modal */}
-      {isEditing === 'subject' && (
+      {isSubjectEditorOpen && (
         <SubjectsEditor 
-          editingSubject={editingItem as Subject} 
+          editingSubject={editingSubject} 
           onClose={() => {
-            setIsEditing(null);
-            setEditingItem(null);
+            setIsSubjectEditorOpen(false);
+            setEditingSubject(undefined);
           }}
           onSave={handleSaveSubject}
         />
       )}
 
       {/* Calendar Event Editor Modal */}
-      {isEditing === 'event' && (
+      {isCalendarEventEditorOpen && (
         <CalendarEventEditor 
-          editingEvent={editingItem as CalendarEvent} 
+          editingEvent={editingCalendarEvent} 
           onClose={() => {
-            setIsEditing(null);
-            setEditingItem(null);
+            setIsCalendarEventEditorOpen(false);
+            setEditingCalendarEvent(undefined);
           }}
           onSave={handleSaveCalendarEvent}
+        />
+      )}
+
+      {/* Teacher Content Editor Modal */}
+      {isTeacherContentEditorOpen && (
+        <TeacherContentEditor
+          onClose={() => {
+            setIsTeacherContentEditorOpen(false);
+            setEditingTeacherContent(undefined);
+          }}
+          editingTeacher={editingTeacherContent}
+          onSave={handleSaveTeacherContent}
         />
       )}
     </div>

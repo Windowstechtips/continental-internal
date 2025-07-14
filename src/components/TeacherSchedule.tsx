@@ -1362,6 +1362,7 @@ export default function TeacherSchedule() {
                     >
                       <option value="Grade 9">Grade 9</option>
                       <option value="Grade 10">Grade 10</option>
+                      <option value="AS">AS</option>
                     </select>
                   </div>
                   
