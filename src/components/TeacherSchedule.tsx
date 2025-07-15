@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
-import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon, MapPinIcon, AcademicCapIcon, ClockIcon, BookOpenIcon, HomeIcon, PlusIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon, MapPinIcon, AcademicCapIcon, ClockIcon, BookOpenIcon, HomeIcon, PlusIcon, PencilIcon, UserIcon } from '@heroicons/react/24/outline';
 
 interface Teacher {
   id: number;
@@ -21,7 +21,8 @@ interface Schedule {
   day: string;
   start_time: string;
   end_time: string;
-  room: string | null;
+  room: string;
+  mode: string;
   grade: string;
   curriculum: string;
   date_tag: string;
@@ -38,6 +39,7 @@ interface ScheduleFormData {
   grade: string;
   curriculum: string;
   room: string;
+  mode: string;
   teacher_id: number;
   day: string;
   start_time: string;
@@ -65,14 +67,24 @@ export default function TeacherSchedule() {
   const [mobileStartDate, setMobileStartDate] = useState(new Date()); // For mobile view dates
   const [showAllSchedules, setShowAllSchedules] = useState(true); // State for showing all schedules, default to true
   
+  // New states for context menu
+  const [contextMenu, setContextMenu] = useState<{
+    show: boolean;
+    x: number;
+    y: number;
+    day: Date;
+    hour: number;
+  } | null>(null);
+  
   // New states for scheduling
   const [canSchedule, setCanSchedule] = useState(false);
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [schedulingFormData, setSchedulingFormData] = useState<ScheduleFormData>({
     subject: '',
-    grade: '',
-    curriculum: '',
+    grade: 'Grade 9',
+    curriculum: 'Edexcel',
     room: '',
+    mode: 'Class', // Changed from 'Online' to 'Class'
     teacher_id: 0,
     day: '',
     start_time: '',
@@ -84,12 +96,11 @@ export default function TeacherSchedule() {
   const [selectedScheduleDay, setSelectedScheduleDay] = useState<Date | null>(null);
   const [selectedScheduleHour, setSelectedScheduleHour] = useState<number | null>(null);
   
-  // New states for deletion options
-  const [showDeleteOptions, setShowDeleteOptions] = useState(false);
+  // States for deletion options
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [deleteMode, setDeleteMode] = useState<'cancel' | 'delete' | null>(null);
 
-  // New state for edit mode
+  // State for edit mode
   const [isEditMode, setIsEditMode] = useState(false);
 
   // Get the current week's start date (Monday)
@@ -347,7 +358,6 @@ export default function TeacherSchedule() {
   const handleCardClick = (schedule: Schedule, day: Date) => {
     setSelectedSchedule(schedule);
     setSelectedScheduleDay(day);
-    setShowDeleteOptions(canSchedule); // Only show delete options if user can schedule
     setIsModalOpen(true);
   };
 
@@ -355,24 +365,13 @@ export default function TeacherSchedule() {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedSchedule(null);
-    setShowDeleteOptions(false);
-    setDeleteMode(null);
-  };
-
-  // Toggle delete options
-  const toggleDeleteOptions = () => {
-    setShowDeleteOptions(!showDeleteOptions);
   };
 
   // Handle delete button click
   const handleDeleteClick = (mode: 'cancel' | 'delete') => {
-    console.log('Delete button clicked with mode:', mode);
-    console.log('Current selected schedule:', selectedSchedule);
-    console.log('Current selected day:', selectedScheduleDay);
-    
     setDeleteMode(mode);
-    setShowDeleteOptions(false);
-    setIsConfirmDeleteOpen(true);
+    setIsSchedulingModalOpen(false); // Close the scheduling modal
+    setIsConfirmDeleteOpen(true); // Open the confirmation modal
   };
 
   // Close confirm delete modal
@@ -507,7 +506,15 @@ export default function TeacherSchedule() {
   const handleFormTeacherChange = (teacherId: number) => {
     // Get the teacher
     const teacher = teachers.find(t => t.id === teacherId);
-    if (!teacher) return;
+    if (!teacher) {
+      // If no teacher selected, reset subject
+      setSchedulingFormData({
+        ...schedulingFormData,
+        teacher_id: 0,
+        subject: ''
+      });
+      return;
+    }
     
     // Get all subjects for this teacher
     const subjects = getTeacherSubjects(teacherId);
@@ -530,6 +537,7 @@ export default function TeacherSchedule() {
       grade: schedule.grade,
       curriculum: schedule.curriculum,
       room: schedule.room || '',
+      mode: schedule.mode, // Added mode field
       teacher_id: schedule.teacher_id,
       day: schedule.day,
       start_time: schedule.start_time,
@@ -572,20 +580,14 @@ export default function TeacherSchedule() {
     // Format date tag (for non-time schedules)
     const dateTag = format(day, 'yyyy-MM-dd');
     
-    // Get initial teacher ID from available teachers
-    const initialTeacherId = selectedTeacher?.id || (teachersWithSubjects[0]?.id || 0);
-    
-    // Get subjects for the initial teacher
-    const initialSubjects = getTeacherSubjects(initialTeacherId);
-    const initialSubject = initialSubjects.length > 0 ? initialSubjects[0] : '';
-    
-    // Initialize form data
+    // Initialize form data with no teacher selected
     setSchedulingFormData({
-      subject: initialSubject,
+      subject: '',
       grade: 'Grade 9',
       curriculum: 'Edexcel',
-      room: '', // We keep this in the state but won't show it in the UI
-      teacher_id: initialTeacherId,
+      room: '',
+      mode: 'Class', // Changed from 'Online' to 'Class'
+      teacher_id: 0, // No teacher selected
       day: dayString,
       start_time: startTime,
       end_time: endTime,
@@ -605,6 +607,12 @@ export default function TeacherSchedule() {
   // Update handleScheduleSubmit to handle both create and edit
   const handleScheduleSubmit = async () => {
     try {
+      // Validate teacher selection
+      if (!isEditMode && schedulingFormData.teacher_id === 0) {
+        setError('Please select a teacher');
+        return;
+      }
+
       if (isEditMode && selectedSchedule) {
         // Update existing schedule
         const { error } = await supabase
@@ -613,7 +621,8 @@ export default function TeacherSchedule() {
             subject: schedulingFormData.subject,
             grade: schedulingFormData.grade,
             curriculum: schedulingFormData.curriculum,
-            room: null, // Always set room to null since we removed this field
+            room: schedulingFormData.room, // Changed to non-nullable
+            mode: schedulingFormData.mode, // Added mode field
             teacher_id: schedulingFormData.teacher_id,
             day: schedulingFormData.day,
             start_time: schedulingFormData.start_time,
@@ -633,7 +642,8 @@ export default function TeacherSchedule() {
             subject: schedulingFormData.subject,
             grade: schedulingFormData.grade,
             curriculum: schedulingFormData.curriculum,
-            room: null, // Always set room to null since we removed this field
+            room: schedulingFormData.room, // Changed to non-nullable
+            mode: schedulingFormData.mode, // Added mode field
             teacher_id: schedulingFormData.teacher_id,
             day: schedulingFormData.day,
             start_time: schedulingFormData.start_time,
@@ -650,6 +660,7 @@ export default function TeacherSchedule() {
       setIsSchedulingModalOpen(false);
       setIsEditMode(false);
       setSelectedSchedule(null);
+      setError(null); // Clear any previous errors
       fetchData();
     } catch (error) {
       console.error('Error scheduling class:', error);
@@ -664,13 +675,49 @@ export default function TeacherSchedule() {
     setSelectedSchedule(null);
   };
 
-  // Render a schedule cell
+  // Handle context menu
+  const handleContextMenu = (e: React.MouseEvent, day: Date, hour: number) => {
+    if (!canSchedule) return; // Only show context menu if user can schedule
+    
+    e.preventDefault(); // Prevent default context menu
+    
+    // Calculate position, keeping the menu within viewport bounds
+    const x = Math.min(e.clientX, window.innerWidth - 200); // 200 is approximate menu width
+    const y = Math.min(e.clientY, window.innerHeight - 100); // 100 is approximate menu height
+    
+    setContextMenu({
+      show: true,
+      x,
+      y,
+      day,
+      hour
+    });
+  };
+
+  // Handle clicking outside context menu
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu) {
+        setContextMenu(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [contextMenu]);
+
+  // Render schedule cell
   const renderScheduleCell = (day: Date, hour: number) => {
     const schedules = getSchedulesForDayAndHour(day, hour);
     const now = new Date();
     
     return (
-      <div className="relative min-h-[60px] bg-gray-800/30 group/cell">
+      <div 
+        className="relative min-h-[60px] bg-gray-800/30 group/cell"
+        onContextMenu={(e) => handleContextMenu(e, day, hour)}
+      >
         {schedules.map(schedule => {
           // Check if the schedule has finished (either a past day or finished today)
           const isPastDay = day < now && !isSameDay(day, now);
@@ -689,8 +736,12 @@ export default function TeacherSchedule() {
               onClick={() => handleCardClick(schedule, day)}
               className={`absolute inset-x-1 ${
                 isFinished 
-                  ? 'bg-gray-800/90 border-gray-700/50 hover:bg-gray-700/90' 
-                  : 'bg-gradient-to-br from-blue-600/30 to-indigo-500/20 hover:from-blue-600/40 hover:to-indigo-500/30 border-blue-400/40'
+                  ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' 
+                  : schedule.mode === 'Mock'
+                    ? 'bg-gradient-to-br from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 border-emerald-400'
+                    : schedule.mode === 'Seminar'
+                      ? 'bg-gradient-to-br from-amber-600 to-yellow-500 hover:from-amber-700 hover:to-yellow-600 border-amber-400'
+                      : 'bg-gradient-to-br from-blue-600 to-indigo-500 hover:from-blue-700 hover:to-indigo-600 border-blue-400'
               } border rounded-md p-2 text-xs ${
                 isFinished ? 'text-gray-400' : 'text-gray-200'
               } shadow-md transition-all duration-200 cursor-pointer transform hover:scale-[1.02] hover:z-20 group overflow-hidden`}
@@ -702,9 +753,14 @@ export default function TeacherSchedule() {
             >
               {/* Create a colorful accent line at the top of each card */}
               <div className={`absolute top-0 left-0 right-0 h-1 ${
-                isFinished ? 'bg-gray-600/60' : 'bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400'
+                isFinished ? 'bg-gray-600/60' 
+                : schedule.mode === 'Mock'
+                  ? 'bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400'
+                  : schedule.mode === 'Seminar'
+                    ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-orange-400'
+                    : 'bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400'
               } rounded-t`}></div>
-              
+
               {/* Edit button - only shown on hover and when user has scheduling rights */}
               {canSchedule && !isSmallCard && (
                 <div 
@@ -722,7 +778,11 @@ export default function TeacherSchedule() {
                   <div className={`font-bold ${
                     isFinished 
                       ? 'text-gray-400' 
-                      : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-sky-200'
+                      : schedule.mode === 'Mock'
+                        ? 'text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-green-200'
+                        : schedule.mode === 'Seminar'
+                          ? 'text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200'
+                          : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-sky-200'
                   } text-[clamp(0.75rem,1.2vw,1rem)] leading-tight break-words ${
                     isSmallCard ? 'truncate' : ''
                   }`}>
@@ -732,38 +792,60 @@ export default function TeacherSchedule() {
                   {/* Only show additional content if not a small card */}
                   {!isSmallCard && (
                     <>
+                      {/* Teacher name */}
+                      <div className={`text-[clamp(0.65rem,0.8vw,0.875rem)] font-medium ${
+                        isFinished ? 'text-gray-500' : 'text-gray-300'
+                      }`}>
+                        {schedule.teachers.name}
+                      </div>
+
                       {/* Combined Grade and Curriculum pill */}
                       <div className={`inline-flex items-center rounded-full px-2 py-0.5 text-[clamp(0.65rem,0.8vw,0.875rem)] font-medium min-w-fit ${
                         isFinished
                           ? 'bg-gray-700/60 text-gray-400'
-                          : 'bg-blue-500/20 text-blue-100'
+                          : schedule.mode === 'Mock'
+                            ? 'bg-emerald-500/20 text-emerald-100'
+                            : schedule.mode === 'Seminar'
+                              ? 'bg-amber-500/20 text-amber-100'
+                              : 'bg-blue-500/20 text-blue-100'
                       } my-1`}>
                         <span className="font-medium">{schedule.grade}</span>
                         <span className="mx-1 opacity-50">•</span>
                         <span className="font-light italic">{schedule.curriculum}</span>
                       </div>
+
+                      {/* Mode */}
+                      <div className={`flex items-center mt-1 ${
+                        isFinished ? 'text-gray-600' : 'text-gray-400'
+                      } text-[clamp(0.65rem,0.8vw,0.875rem)] whitespace-nowrap`}>
+                        <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs ${
+                          isFinished ? 'bg-gray-700 text-gray-400' 
+                          : schedule.mode === 'Mock'
+                            ? 'bg-emerald-500/20 text-emerald-100'
+                            : schedule.mode === 'Seminar'
+                              ? 'bg-amber-500/20 text-amber-100'
+                              : 'bg-blue-500/20 text-blue-100'
+                        }`}>
+                          {schedule.mode}
+                        </span>
+                      </div>
                       
                       {/* Time with eye-catching style */}
-                      <div className={`flex items-center mt-auto pt-1 ${
+                      <div className={`flex items-center mt-1 ${
                         isFinished ? 'text-gray-500' : 'text-gray-300'
                       } text-[clamp(0.65rem,0.8vw,0.875rem)] font-medium whitespace-nowrap`}>
-                        <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <ClockIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
                         <span className={`${isFinished ? '' : 'tracking-wide'}`}>
                           {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
                         </span>
                       </div>
 
+                      {/* Room */}
                       {schedule.room && (
                         <div className={`flex items-center mt-1 ${
                           isFinished ? 'text-gray-600' : 'text-gray-400'
                         } text-[clamp(0.65rem,0.8vw,0.875rem)] whitespace-nowrap`}>
-                          <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full ${
-                            isFinished ? 'bg-gray-700' : 'bg-blue-500/30'
-                          } mr-1 flex-shrink-0`}>
-                            <span className="text-[8px]">R</span>
-                          </span>
+                          <MapPinIcon className="h-3.5 w-3.5 mr-1 flex-shrink-0" />
                           <span className="break-words">{schedule.room}</span>
                         </div>
                       )}
@@ -865,6 +947,28 @@ export default function TeacherSchedule() {
         <div className="absolute -top-[10%] right-[5%] w-[80vw] h-[70vh] bg-gradient-to-bl from-blue-600/8 via-blue-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
         <div className="absolute -bottom-[10%] left-[5%] w-[80vw] h-[70vh] bg-gradient-to-tr from-blue-500/8 via-sky-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-gray-900 rounded-lg border border-gray-700/50 shadow-xl overflow-hidden"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+        >
+          <button
+            onClick={() => {
+              handleScheduleClick(contextMenu.day, contextMenu.hour);
+              setContextMenu(null);
+            }}
+            className="w-full px-4 py-2 text-left text-gray-200 hover:bg-gray-800 flex items-center space-x-2"
+          >
+            <PlusIcon className="h-4 w-4" />
+            <span>Add Class</span>
+          </button>
+        </div>
+      )}
 
       <div className="relative z-10 p-4 md:p-6 flex flex-col h-[calc(100vh-2rem)]">
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
@@ -1094,63 +1198,21 @@ export default function TeacherSchedule() {
             >
               {/* Modal Header with Accent Gradient */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
+                <div className={`absolute inset-0 ${
+                  selectedSchedule.mode === 'Mock'
+                    ? 'bg-gradient-to-r from-emerald-600 to-green-400'
+                    : selectedSchedule.mode === 'Seminar'
+                      ? 'bg-gradient-to-r from-amber-600 to-yellow-400'
+                      : 'bg-gradient-to-r from-blue-600 to-sky-400'
+                } opacity-90`}></div>
                 <div className="relative p-5 flex justify-between items-center">
                   <h3 className="text-xl font-bold text-white">{selectedSchedule.subject}</h3>
-                  <div className="flex items-center space-x-2 relative">
-                    {showDeleteOptions && (
-                      <button 
-                        onClick={toggleDeleteOptions}
-                        className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
-                      >
-                        <XMarkIcon className="h-6 w-6" />
-                      </button>
-                    )}
-                    {canSchedule && !showDeleteOptions && (
-                      <button 
-                        onClick={toggleDeleteOptions}
-                        className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M6 10a2 2 0 11-4 0 2 2 0 014 0zM12 10a2 2 0 11-4 0 2 2 0 014 0zM16 12a2 2 0 100-4 2 2 0 000 4z" />
-                        </svg>
-                      </button>
-                    )}
-                    <button 
-                      onClick={closeModal}
-                      className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
-                    >
-                      <XMarkIcon className="h-6 w-6" />
-                    </button>
-                    
-                    {/* Delete Options Menu - Now positioned properly */}
-                    {showDeleteOptions && (
-                      <div className="absolute right-0 top-10 bg-gray-800 rounded-lg border border-gray-700/50 shadow-lg z-20 overflow-hidden">
-                        <div className="p-1">
-                          {selectedSchedule.repeats && (
-                            <button
-                              onClick={() => handleDeleteClick('cancel')}
-                              className="flex items-center w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700/50 rounded-md transition-colors"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
-                              </svg>
-                              Cancel this occurrence
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteClick('delete')}
-                            className="flex items-center w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700/50 rounded-md transition-colors"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                            Delete {selectedSchedule.repeats ? 'all occurrences' : 'class'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <button 
+                    onClick={closeModal}
+                    className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
                 </div>
               </div>
               
@@ -1179,16 +1241,30 @@ export default function TeacherSchedule() {
                       <p className="text-gray-500 text-xs mt-1">{selectedSchedule.curriculum}</p>
                     </div>
                   </div>
-                  
-                  {selectedSchedule.room && (
-                    <div className="flex items-start space-x-3">
-                      <MapPinIcon className="h-5 w-5 text-blue-400 mt-0.5" />
-                      <div>
-                        <p className="text-gray-400 text-sm font-medium">Location</p>
-                        <p className="text-white text-base">Room {selectedSchedule.room}</p>
-                      </div>
+
+                  <div className="flex items-start space-x-3">
+                    <MapPinIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Room</p>
+                      <p className="text-white text-base">{selectedSchedule.room || 'Not specified'}</p>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <AcademicCapIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Mode</p>
+                      <p className="text-white text-base">{selectedSchedule.mode}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <UserIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+                    <div>
+                      <p className="text-gray-400 text-sm font-medium">Teacher</p>
+                      <p className="text-white text-base">{selectedSchedule.teachers.name}</p>
+                    </div>
+                  </div>
                   
                   <div className="flex items-start space-x-3">
                     <BookOpenIcon className="h-5 w-5 text-blue-400 mt-0.5" />
@@ -1245,26 +1321,19 @@ export default function TeacherSchedule() {
               </div>
               
               {/* Modal Content */}
-              <div className="p-5 space-y-4">
-                <div className="text-gray-300">
-                  {deleteMode === 'cancel' ? (
-                    <p>
-                      Are you sure you want to cancel <span className="text-white font-medium">{selectedSchedule.subject}</span> on <span className="text-white font-medium">{format(selectedScheduleDay || new Date(), 'EEEE, MMMM d, yyyy')}</span>?
-                    </p>
-                  ) : (
-                    <p>
-                      Are you sure you want to delete {selectedSchedule.repeats ? 'all occurrences of ' : ''}<span className="text-white font-medium">{selectedSchedule.subject}</span>?
-                    </p>
-                  )}
-                  
-                  <div className="mt-2 p-3 bg-red-900/20 border border-red-800/30 rounded-lg text-sm text-red-200">
-                    <p>
-                      {deleteMode === 'cancel' ? 
-                        'This will only cancel this specific occurrence, but the class will continue for other dates.' : 
-                        'This action cannot be undone and will permanently remove this class from the schedule.'}
-                    </p>
-                  </div>
-                </div>
+              <div className="p-5">
+                <p className="text-gray-300 mb-4">
+                  {deleteMode === 'cancel'
+                    ? `Are you sure you want to cancel this class on ${format(selectedScheduleDay!, 'MMMM d, yyyy')}?`
+                    : 'Are you sure you want to delete all occurrences of this class?'
+                  }
+                </p>
+                <p className="text-sm text-gray-400 mb-6">
+                  {deleteMode === 'cancel'
+                    ? 'This will only cancel this specific occurrence of the class.'
+                    : 'This action cannot be undone and will remove all instances of this class from the schedule.'
+                  }
+                </p>
               </div>
               
               {/* Modal Footer */}
@@ -1277,9 +1346,13 @@ export default function TeacherSchedule() {
                 </button>
                 <button 
                   onClick={confirmDelete}
-                  className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                  className={`px-4 py-2 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ${
+                    deleteMode === 'cancel'
+                      ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400'
+                      : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400'
+                  }`}
                 >
-                  {deleteMode === 'cancel' ? 'Confirm Cancellation' : 'Confirm Deletion'}
+                  {deleteMode === 'cancel' ? 'Cancel Class' : 'Delete Class'}
                 </button>
               </div>
             </div>
@@ -1323,15 +1396,21 @@ export default function TeacherSchedule() {
                     <select
                       value={schedulingFormData.teacher_id}
                       onChange={e => handleFormTeacherChange(parseInt(e.target.value))}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className={`w-full px-3 py-2 bg-gray-800/80 border rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                        !isEditMode && schedulingFormData.teacher_id === 0 ? 'border-amber-500' : 'border-gray-700'
+                      }`}
                       required
                     >
+                      <option value={0} disabled>Select a teacher</option>
                       {teachersWithSubjects.map(teacher => (
                         <option key={teacher.id} value={teacher.id}>
                           {teacher.name}
                         </option>
                       ))}
                     </select>
+                    {!isEditMode && schedulingFormData.teacher_id === 0 && (
+                      <p className="mt-1 text-xs text-amber-500">Please select a teacher</p>
+                    )}
                   </div>
                   
                   {/* Subject */}
@@ -1342,12 +1421,17 @@ export default function TeacherSchedule() {
                       onChange={e => setSchedulingFormData({...schedulingFormData, subject: e.target.value})}
                       className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
+                      disabled={schedulingFormData.teacher_id === 0}
                     >
-                      {getTeacherSubjects(schedulingFormData.teacher_id).map(subject => (
-                        <option key={subject} value={subject}>
-                          {subject}
-                        </option>
-                      ))}
+                      {schedulingFormData.teacher_id === 0 ? (
+                        <option value="">Select a teacher first</option>
+                      ) : (
+                        getTeacherSubjects(schedulingFormData.teacher_id).map(subject => (
+                          <option key={subject} value={subject}>
+                            {subject}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                   
@@ -1377,6 +1461,33 @@ export default function TeacherSchedule() {
                     >
                       <option value="Edexcel">Edexcel</option>
                       <option value="Cambridge">Cambridge</option>
+                    </select>
+                  </div>
+                  
+                  {/* Room */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Room</label>
+                    <input
+                      type="text"
+                      value={schedulingFormData.room}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, room: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      placeholder="Enter room number/name"
+                    />
+                  </div>
+
+                  {/* Mode */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-400 mb-1">Mode</label>
+                    <select
+                      value={schedulingFormData.mode}
+                      onChange={e => setSchedulingFormData({...schedulingFormData, mode: e.target.value})}
+                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      required
+                    >
+                      <option value="Mock">Mock</option>
+                      <option value="Class">Class</option>
+                      <option value="Seminar">Seminar</option>
                     </select>
                   </div>
                   
@@ -1434,19 +1545,42 @@ export default function TeacherSchedule() {
               </div>
               
               {/* Modal Footer */}
-              <div className="border-t border-gray-800 p-4 flex justify-end space-x-3">
-                <button 
-                  onClick={closeSchedulingModal}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleScheduleSubmit}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
-                >
-                  {isEditMode ? 'Update Class' : 'Schedule Class'}
-                </button>
+              <div className="border-t border-gray-800 p-4 flex justify-between items-center">
+                {/* Delete options - only shown in edit mode */}
+                {isEditMode && (
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => handleDeleteClick('cancel')}
+                      className="px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg transition-colors flex items-center space-x-1"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                      <span>Cancel This Occurrence</span>
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteClick('delete')}
+                      className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors flex items-center space-x-1"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                      <span>Delete All Occurrences</span>
+                    </button>
+                  </div>
+                )}
+                
+                {/* Save/Cancel buttons */}
+                <div className="flex space-x-3">
+                  <button 
+                    onClick={closeSchedulingModal}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleScheduleSubmit}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                  >
+                    {isEditMode ? 'Update Class' : 'Schedule Class'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
