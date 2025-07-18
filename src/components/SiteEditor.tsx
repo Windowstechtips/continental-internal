@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
@@ -41,6 +41,8 @@ interface Subject {
   subject_name: string;
   subject_description: string;
   whatsapp_link: string;
+  grade?: string | null;  // "9,10,AS"
+  syllabus?: string | null;  // "Cambridge,Edexcel"
 }
 
 interface CalendarEvent {
@@ -75,7 +77,21 @@ const SubjectCard = ({ subject, onEdit, onDelete }: {
         </button>
       </div>
     </div>
-    <p className="text-gray-400 text-sm line-clamp-2">{subject.subject_description}</p>
+    <p className="text-gray-400 text-sm line-clamp-2 mb-3">{subject.subject_description}</p>
+    
+    {/* Display grades and syllabus if available */}
+    <div className="flex flex-wrap gap-2 mt-2">
+      {subject.grade && subject.grade.split(',').map(grade => (
+        <span key={grade} className="px-2 py-1 bg-blue-900/30 text-blue-300 text-xs rounded-md border border-blue-800/50">
+          {grade === 'AS' ? 'AS' : `Grade ${grade}`}
+        </span>
+      ))}
+      {subject.syllabus && subject.syllabus.split(',').map(syllabus => (
+        <span key={syllabus} className="px-2 py-1 bg-purple-900/30 text-purple-300 text-xs rounded-md border border-purple-800/50">
+          {syllabus}
+        </span>
+      ))}
+    </div>
   </div>
 );
 
@@ -88,15 +104,28 @@ const SubjectsEditor = ({ onClose, editingSubject, onSave }: {
   const [formData, setFormData] = useState({
     subject_name: editingSubject?.subject_name || '',
     subject_description: editingSubject?.subject_description || '',
-    whatsapp_link: editingSubject?.whatsapp_link || ''
+    whatsapp_link: editingSubject?.whatsapp_link || '',
+    grade: editingSubject?.grade || '',
+    syllabus: editingSubject?.syllabus || ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>(
+    editingSubject?.grade ? editingSubject.grade.split(',') : []
+  );
+  const [selectedSyllabi, setSelectedSyllabi] = useState<string[]>(
+    editingSubject?.syllabus ? editingSubject.syllabus.split(',') : []
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await onSave(formData);
+      const updatedFormData = {
+        ...formData,
+        grade: selectedGrades.join(','),
+        syllabus: selectedSyllabi.join(',')
+      };
+      await onSave(updatedFormData);
       onClose();
     } catch (error) {
       console.error('Error saving subject:', error);
@@ -108,6 +137,26 @@ const SubjectsEditor = ({ onClose, editingSubject, onSave }: {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleGradeChange = (grade: string) => {
+    setSelectedGrades(prev => {
+      if (prev.includes(grade)) {
+        return prev.filter(g => g !== grade);
+      } else {
+        return [...prev, grade];
+      }
+    });
+  };
+
+  const handleSyllabusChange = (syllabus: string) => {
+    setSelectedSyllabi(prev => {
+      if (prev.includes(syllabus)) {
+        return prev.filter(s => s !== syllabus);
+      } else {
+        return [...prev, syllabus];
+      }
+    });
   };
 
   return (
@@ -160,6 +209,66 @@ const SubjectsEditor = ({ onClose, editingSubject, onSave }: {
               className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-inner"
               placeholder="Enter WhatsApp group link (optional)"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Grades</label>
+            <div className="space-y-2">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  name="grade_9"
+                  checked={selectedGrades.includes('9')}
+                  onChange={() => handleGradeChange('9')}
+                  className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                />
+                <span className="text-gray-300">Grade 9</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  name="grade_10"
+                  checked={selectedGrades.includes('10')}
+                  onChange={() => handleGradeChange('10')}
+                  className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                />
+                <span className="text-gray-300">Grade 10</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  name="grade_as"
+                  checked={selectedGrades.includes('AS')}
+                  onChange={() => handleGradeChange('AS')}
+                  className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                />
+                <span className="text-gray-300">AS</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 text-gray-300">Syllabus</label>
+            <div className="space-y-2">
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  name="curriculum_edexcel"
+                  checked={selectedSyllabi.includes('Edexcel')}
+                  onChange={() => handleSyllabusChange('Edexcel')}
+                  className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                />
+                <span className="text-gray-300">Edexcel</span>
+              </label>
+              <label className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  name="curriculum_cambridge"
+                  checked={selectedSyllabi.includes('Cambridge')}
+                  onChange={() => handleSyllabusChange('Cambridge')}
+                  className="w-4 h-4 rounded border-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-gray-800/80"
+                />
+                <span className="text-gray-300">Cambridge</span>
+              </label>
+            </div>
           </div>
           <div className="flex justify-end space-x-3 pt-4">
             <button
@@ -791,6 +900,10 @@ export default function SiteEditor() {
   const [editingTeacherContent, setEditingTeacherContent] = useState<Teacher | undefined>();
   const [isTeacherContentLoading, setIsTeacherContentLoading] = useState(false);
   const [teacherContentError, setTeacherContentError] = useState<string | null>(null);
+  const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
+  const [subjectsError, setSubjectsError] = useState<string | null>(null);
+  const [activeGradeFilter, setActiveGradeFilter] = useState<string | null>(null);
+  const [activeSyllabusFilter, setActiveSyllabusFilter] = useState<string | null>(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -809,6 +922,8 @@ export default function SiteEditor() {
 
   // Fetch data when component mounts or path changes
   const fetchSubjects = async () => {
+    setIsSubjectsLoading(true);
+    setSubjectsError(null);
     try {
       const { data, error } = await supabase
         .from('subjects_content')
@@ -819,6 +934,9 @@ export default function SiteEditor() {
       setSubjects(data || []);
     } catch (err) {
       console.error('Error fetching subjects:', err);
+      setSubjectsError('Failed to load subjects. Please try again.');
+    } finally {
+      setIsSubjectsLoading(false);
     }
   };
 
@@ -1009,6 +1127,25 @@ export default function SiteEditor() {
     }
   };
 
+  // Filter subjects based on active filters
+  const filteredSubjects = useMemo(() => {
+    return subjects.filter(subject => {
+      // If no filters are active, show all subjects
+      if (!activeGradeFilter && !activeSyllabusFilter) return true;
+      
+      // Check grade filter
+      const passesGradeFilter = !activeGradeFilter || 
+        (subject.grade && subject.grade.split(',').includes(activeGradeFilter));
+      
+      // Check syllabus filter
+      const passesSyllabusFilter = !activeSyllabusFilter || 
+        (subject.syllabus && subject.syllabus.split(',').includes(activeSyllabusFilter));
+      
+      // Subject must pass both active filters
+      return passesGradeFilter && passesSyllabusFilter;
+    });
+  }, [subjects, activeGradeFilter, activeSyllabusFilter]);
+
   return (
     <div className="container mx-auto px-4">
       {/* Site Editor Navigation */}
@@ -1047,11 +1184,123 @@ export default function SiteEditor() {
               </button>
             </div>
             
-            {/* Error messages for subjects and calendar events are removed as per new_code */}
+            {/* Filter tabs */}
+            <div className="mb-6">
+              <div className="mb-3">
+                <h3 className="text-sm font-medium text-gray-400 mb-2">Filter by Grade:</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setActiveGradeFilter(null)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      activeGradeFilter === null
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setActiveGradeFilter('9')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      activeGradeFilter === '9'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    }`}
+                  >
+                    Grade 9
+                  </button>
+                  <button
+                    onClick={() => setActiveGradeFilter('10')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      activeGradeFilter === '10'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    }`}
+                  >
+                    Grade 10
+                  </button>
+                  <button
+                    onClick={() => setActiveGradeFilter('AS')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      activeGradeFilter === 'AS'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    }`}
+                  >
+                    AS
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="text-sm font-medium text-gray-400 mb-2">Filter by Syllabus:</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setActiveSyllabusFilter(null)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      activeSyllabusFilter === null
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setActiveSyllabusFilter('Cambridge')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      activeSyllabusFilter === 'Cambridge'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    }`}
+                  >
+                    Cambridge
+                  </button>
+                  <button
+                    onClick={() => setActiveSyllabusFilter('Edexcel')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      activeSyllabusFilter === 'Edexcel'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300'
+                    }`}
+                  >
+                    Edexcel
+                  </button>
+                </div>
+              </div>
+            </div>
             
-            {/* Loading states for subjects and calendar events are removed as per new_code */}
-            
-            {/* Subject list rendering is removed as per new_code */}
+            {/* Subject list rendering */}
+            {isSubjectsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : subjectsError ? (
+              <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-red-400">{subjectsError}</p>
+              </div>
+            ) : subjects.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-400">No subjects found. Click "Add Subject" to create one.</p>
+              </div>
+            ) : filteredSubjects.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-400">No subjects match the selected filters.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredSubjects.map(subject => (
+                  <SubjectCard
+                    key={subject.id}
+                    subject={subject}
+                    onEdit={() => {
+                      setEditingSubject(subject);
+                      setIsSubjectEditorOpen(true);
+                    }}
+                    onDelete={() => handleDeleteSubject(subject.id)}
+                  />
+                ))}
+              </div>
+            )}
             
             {/* Subject Editor Modal is removed as per new_code */}
             

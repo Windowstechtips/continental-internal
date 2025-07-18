@@ -1129,8 +1129,24 @@ export default function TeacherSchedule() {
                               {isCurrentHour && isToday && currentTimePos && (
                                 <div 
                                   className="absolute left-0 right-0 h-0.5 bg-red-500 z-30"
-                                  style={{ top: `${currentTimePos.position}%` }}
-                                ></div>
+                                  style={{ 
+                                    top: `${currentTimePos.position}%`,
+                                    width: '100%' // Added full width
+                                  }}
+                                >
+                                  {/* Time indicator displayed only on today's column */}
+                                  <div 
+                                    className="absolute bg-red-500 px-2 py-1 rounded text-white text-xs font-medium min-w-[72px] text-center whitespace-nowrap flex items-center justify-center"
+                                    style={{
+                                      top: '0',
+                                      right: '8px',
+                                      transform: 'translateY(-50%)'
+                                    }}
+                                  >
+                                    <div className="absolute left-[-4px] top-1/2 transform -translate-y-1/2 w-2 h-2 bg-red-500 rotate-45"></div>
+                                    {currentTimePos.formattedTime}
+                                  </div>
+                                </div>
                               )}
                               {renderScheduleCell(date, hour)}
                             </td>
@@ -1151,7 +1167,7 @@ export default function TeacherSchedule() {
                               {isCurrentHour && isToday && currentTimePos && (
                                 <div 
                                   className="absolute left-0 right-0 h-0.5 bg-red-500 z-30"
-                                  style={{ top: `${currentTimePos.position}%` }}
+                                  style={{ top: `${currentTimePos.position}%`, width: '100%' }}
                                 >
                                   {/* Time indicator displayed only on today's column */}
                                   <div 

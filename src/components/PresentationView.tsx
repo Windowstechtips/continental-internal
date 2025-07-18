@@ -23,6 +23,7 @@ interface Schedule {
   teachers: Teacher;
   canceled_dates?: string[];
   description: string;
+  mode?: 'Mock' | 'Seminar' | 'Class';
 }
 
 interface PresentationSettings {
@@ -350,29 +351,70 @@ const PresentationView: React.FC = () => {
     // Determine if this is a compact card (no description)
     const isCompact = !displayDescription;
 
+    // Mode-based color schemes - matched with TeacherSchedule.tsx
+    const getModeColors = () => {
+      switch (schedule.mode) {
+        case 'Mock':
+          return {
+            gradientFrom: 'from-emerald-600',
+            gradientTo: 'to-green-500',
+            borderActive: 'border-emerald-400',
+            shadowActive: 'shadow-[0_0_20px_rgba(16,185,129,0.2)]',
+            bgPill: 'bg-emerald-500/20',
+            textPill: 'text-emerald-100',
+            borderPill: 'border-emerald-500/30',
+            textGradient: 'from-emerald-300 to-green-200'
+          };
+        case 'Seminar':
+          return {
+            gradientFrom: 'from-amber-600',
+            gradientTo: 'to-yellow-500',
+            borderActive: 'border-amber-400',
+            shadowActive: 'shadow-[0_0_20px_rgba(245,158,11,0.2)]',
+            bgPill: 'bg-amber-500/20',
+            textPill: 'text-amber-100',
+            borderPill: 'border-amber-500/30',
+            textGradient: 'from-amber-300 to-yellow-200'
+          };
+        default:
+          return {
+            gradientFrom: 'from-blue-600',
+            gradientTo: 'to-indigo-500',
+            borderActive: 'border-blue-400',
+            shadowActive: 'shadow-[0_0_15px_rgba(59,130,246,0.15)]',
+            bgPill: 'bg-blue-500/20',
+            textPill: 'text-blue-100',
+            borderPill: 'border-blue-500/30',
+            textGradient: 'from-blue-300 to-sky-200'
+          };
+      }
+    };
+
+    const colors = getModeColors();
+
     return (
       <div 
         className={`relative rounded-xl ${isCompact ? 'p-2' : 'p-3.5'} bg-gray-900/75 border transition-all backdrop-blur-md ${
           isPast ? 'opacity-60 border-gray-800/40' :
           isCanceledToday ? 'border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 
-          isActive ? 'border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)]' :
-          isUpcoming ? 'border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.15)]' :
+          isActive ? colors.borderActive + ' ' + colors.shadowActive :
+          isUpcoming ? colors.borderActive + ' ' + colors.shadowActive :
           'border-gray-800/50'
         } overflow-hidden`}
       >
         {/* Status indicator and time in a single row */}
         <div className="flex justify-between items-center mb-1">
-          <div>
+          <div className="flex gap-2 items-center">
             {isCanceledToday ? (
               <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-red-900/30 text-red-400 border border-red-500/30`}>
                 Canceled
               </span>
             ) : isActive ? (
-              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-emerald-900/30 text-emerald-400 border border-emerald-500/30`}>
+              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium ${colors.bgPill} ${colors.textPill} border ${colors.borderPill}`}>
                 In Progress
               </span>
             ) : isUpcoming ? (
-              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-blue-900/30 text-blue-400 border border-blue-500/30`}>
+              <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium ${colors.bgPill} ${colors.textPill} border ${colors.borderPill}`}>
                 Up Next
               </span>
             ) : (
@@ -380,9 +422,15 @@ const PresentationView: React.FC = () => {
                 Completed
               </span>
             )}
+            {/* Show mode label for Mock and Seminar */}
+            {schedule.mode && schedule.mode !== 'Class' && (
+              <span className={`px-2 py-0.5 rounded-md text-lg font-bold ${colors.bgPill} ${colors.textPill} border ${colors.borderPill}`}>
+                {schedule.mode}
+              </span>
+            )}
           </div>
           <div className="text-right font-medium text-base">
-            <span className="bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
+            <span className={`bg-gradient-to-r ${colors.textGradient} bg-clip-text text-transparent`}>
               {(() => {
                 const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
                 const startDate = new Date();
@@ -416,7 +464,7 @@ const PresentationView: React.FC = () => {
               <h3 className={`${isCompact ? 'text-xs' : 'text-sm'} text-gray-300`}>
                 {schedule.teachers?.name}
               </h3>
-              <h2 className={`${isCompact ? 'text-lg' : 'text-2xl'} font-bold bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent`}>
+              <h2 className={`${isCompact ? 'text-lg' : 'text-2xl'} font-bold bg-gradient-to-r ${colors.textGradient} bg-clip-text text-transparent`}>
                 {schedule.subject}
               </h2>
             </div>
@@ -424,16 +472,16 @@ const PresentationView: React.FC = () => {
           
           {/* Redesigned Grade and Curriculum information - inline for space efficiency */}
           <div className={`flex flex-wrap gap-1 ${isCompact ? 'mb-1' : 'mb-2'}`}>
-            <div className="bg-gradient-to-br from-sky-900/40 to-blue-800/20 px-1.5 py-0.5 rounded-lg border border-sky-700/30">
+            <div className={`bg-gradient-to-br from-${colors.gradientFrom.split('-')[1]}-900/40 to-${colors.gradientTo.split('-')[1]}-800/20 px-1.5 py-0.5 rounded-lg border ${colors.borderPill}`}>
               <div className="flex items-center">
-                <span className={`text-sky-400 ${isCompact ? 'text-[10px]' : 'text-xs'} font-medium mr-1`}>Grade:</span>
+                <span className={`${colors.textPill} ${isCompact ? 'text-[10px]' : 'text-xs'} font-medium mr-1`}>Grade:</span>
                 <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-semibold text-white`}>{schedule.grade}</span>
               </div>
             </div>
             
-            <div className="bg-gradient-to-br from-blue-900/40 to-cyan-800/20 px-1.5 py-0.5 rounded-lg border border-blue-700/30">
+            <div className={`bg-gradient-to-br from-${colors.gradientFrom.split('-')[1]}-900/40 to-${colors.gradientTo.split('-')[1]}-800/20 px-1.5 py-0.5 rounded-lg border ${colors.borderPill}`}>
               <div className="flex items-center">
-                <span className={`text-cyan-400 ${isCompact ? 'text-[10px]' : 'text-xs'} font-medium mr-1`}>Curriculum:</span>
+                <span className={`${colors.textPill} ${isCompact ? 'text-[10px]' : 'text-xs'} font-medium mr-1`}>Curriculum:</span>
                 <span className={`${isCompact ? 'text-[10px]' : 'text-xs'} font-semibold text-white`}>{schedule.curriculum}</span>
               </div>
             </div>
@@ -461,10 +509,10 @@ const PresentationView: React.FC = () => {
           )}
         </div>
         
-        {/* Progress bar for active classes - simple green line at bottom of card */}
+        {/* Progress bar for active classes - color based on mode */}
         {isActive && !isCanceledToday && (
           <div 
-            className="absolute bottom-0 left-0 h-1 bg-emerald-500"
+            className={`absolute bottom-0 left-0 h-1 bg-gradient-to-r ${colors.textGradient}`}
             style={{ width: `${progress}%` }}
           />
         )}
@@ -616,7 +664,13 @@ const PresentationView: React.FC = () => {
             {settings?.show_classes && activeClasses.length > 0 && (
               <div className="p-6 border-b border-gray-800/50">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold text-emerald-400">
+                  <h2 className={`text-xl font-semibold ${
+                    activeClasses[currentClassIndex]?.mode === 'Mock'
+                      ? 'text-emerald-400'
+                      : activeClasses[currentClassIndex]?.mode === 'Seminar'
+                        ? 'text-amber-400'
+                        : 'text-blue-400'
+                  }`}>
                     Current Classes {activeClasses.length > 1 && 
                       <span className="text-sm text-gray-400 ml-2">({currentClassIndex + 1}/{activeClasses.length})</span>
                     }
@@ -626,7 +680,15 @@ const PresentationView: React.FC = () => {
                       {activeClasses.map((_, index) => (
                         <div 
                           key={index} 
-                          className={`w-3 h-3 rounded-full ${index === currentClassIndex ? 'bg-emerald-500' : 'bg-gray-700'}`}
+                          className={`w-3 h-3 rounded-full ${
+                            index === currentClassIndex 
+                              ? activeClasses[currentClassIndex]?.mode === 'Mock'
+                                ? 'bg-emerald-500'
+                                : activeClasses[currentClassIndex]?.mode === 'Seminar'
+                                  ? 'bg-amber-500'
+                                  : 'bg-blue-500'
+                              : 'bg-gray-700'
+                          }`}
                         />
                       ))}
                     </div>
@@ -640,15 +702,38 @@ const PresentationView: React.FC = () => {
                         ${index === currentClassIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                     >
                       <div 
-                        className="relative rounded-xl p-6 bg-gray-900/90 border border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md overflow-hidden"
+                        className={`relative rounded-xl p-6 bg-gray-900/90 border ${
+                          schedule.mode === 'Mock'
+                            ? 'border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
+                            : schedule.mode === 'Seminar'
+                              ? 'border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                              : 'border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                        } backdrop-blur-md overflow-hidden`}
                       >
                         {/* Status indicator and time */}
                         <div className="flex justify-between items-center mb-3">
-                          <span className="px-3 py-1.5 rounded-md text-base font-medium bg-emerald-900/40 text-emerald-400 border border-emerald-500/40">
-                            In Progress
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {/* Show mode label */}
+                            {schedule.mode && (
+                              <span className={`px-3 py-1.5 rounded-md text-base font-bold ${
+                                schedule.mode === 'Mock'
+                                  ? 'bg-emerald-500/20 text-emerald-100 border-emerald-500/30'
+                                  : schedule.mode === 'Seminar'
+                                    ? 'bg-amber-500/20 text-amber-100 border-amber-500/30'
+                                    : 'bg-blue-500/20 text-blue-100 border-blue-500/30'
+                                } border`}>
+                                {schedule.mode}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-right font-medium">
-                            <span className="text-xl bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
+                            <span className={`text-xl bg-gradient-to-r ${
+                              schedule.mode === 'Mock'
+                                ? 'from-emerald-300 to-green-200'
+                                : schedule.mode === 'Seminar'
+                                  ? 'from-amber-300 to-yellow-200'
+                                  : 'from-blue-300 to-sky-200'
+                              } bg-clip-text text-transparent`}>
                               {(() => {
                                 const [startHour, startMinute] = schedule.start_time.split(':').map(Number);
                                 const startDate = new Date();
@@ -680,7 +765,13 @@ const PresentationView: React.FC = () => {
                             <h3 className="text-lg text-gray-300 mb-1">
                               {schedule.teachers?.name}
                             </h3>
-                            <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-sky-500 bg-clip-text text-transparent">
+                            <h2 className={`text-3xl font-bold bg-gradient-to-r ${
+                              schedule.mode === 'Mock'
+                                ? 'from-emerald-300 to-green-200'
+                                : schedule.mode === 'Seminar'
+                                  ? 'from-amber-300 to-yellow-200'
+                                  : 'from-blue-300 to-sky-200'
+                              } bg-clip-text text-transparent`}>
                               {schedule.subject}
                             </h2>
                           </div>
@@ -688,27 +779,63 @@ const PresentationView: React.FC = () => {
                         
                         {/* Grade and Curriculum information */}
                         <div className="flex flex-wrap gap-3 mb-3">
-                          <div className="bg-gradient-to-br from-sky-900/40 to-blue-800/20 px-3 py-2 rounded-lg border border-sky-700/30">
+                          <div className={`bg-gradient-to-br ${
+                            schedule.mode === 'Mock'
+                              ? 'from-emerald-900/40 to-green-800/20 border-emerald-700/30'
+                              : schedule.mode === 'Seminar'
+                                ? 'from-amber-900/40 to-yellow-800/20 border-amber-700/30'
+                                : 'from-blue-900/40 to-sky-800/20 border-blue-700/30'
+                            } px-3 py-2 rounded-lg border`}>
                             <div className="flex items-center">
-                              <span className="text-sky-400 text-sm font-medium mr-2">Grade:</span>
+                              <span className={`${
+                                schedule.mode === 'Mock'
+                                  ? 'text-emerald-400'
+                                  : schedule.mode === 'Seminar'
+                                    ? 'text-amber-400'
+                                    : 'text-sky-400'
+                                } text-sm font-medium mr-2`}>Grade:</span>
                               <span className="text-base font-semibold text-white">{schedule.grade}</span>
                             </div>
                           </div>
                           
-                          <div className="bg-gradient-to-br from-blue-900/40 to-cyan-800/20 px-3 py-2 rounded-lg border border-blue-700/30">
+                          <div className={`bg-gradient-to-br ${
+                            schedule.mode === 'Mock'
+                              ? 'from-emerald-900/40 to-green-800/20 border-emerald-700/30'
+                              : schedule.mode === 'Seminar'
+                                ? 'from-amber-900/40 to-yellow-800/20 border-amber-700/30'
+                                : 'from-blue-900/40 to-sky-800/20 border-blue-700/30'
+                            } px-3 py-2 rounded-lg border`}>
                             <div className="flex items-center">
-                              <span className="text-cyan-400 text-sm font-medium mr-2">Curriculum:</span>
+                              <span className={`${
+                                schedule.mode === 'Mock'
+                                  ? 'text-emerald-400'
+                                  : schedule.mode === 'Seminar'
+                                    ? 'text-amber-400'
+                                    : 'text-cyan-400'
+                                } text-sm font-medium mr-2`}>Curriculum:</span>
                               <span className="text-base font-semibold text-white">{schedule.curriculum}</span>
                             </div>
                           </div>
                           
                           {/* Room information if available */}
                           {schedule.room && (
-                            <div className="flex items-center px-3 py-2 bg-gradient-to-r from-gray-800/60 to-gray-700/60 rounded-lg border border-gray-700/50">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                              <span className="text-base font-medium text-gray-200">Room {schedule.room}</span>
+                            <div className={`bg-gradient-to-br ${
+                              schedule.mode === 'Mock'
+                                ? 'from-emerald-900/40 to-green-800/20 border-emerald-700/30'
+                                : schedule.mode === 'Seminar'
+                                  ? 'from-amber-900/40 to-yellow-800/20 border-amber-700/30'
+                                  : 'from-blue-900/40 to-sky-800/20 border-blue-700/30'
+                              } px-3 py-2 rounded-lg border`}>
+                              <div className="flex items-center">
+                                <span className={`${
+                                  schedule.mode === 'Mock'
+                                    ? 'text-emerald-400'
+                                    : schedule.mode === 'Seminar'
+                                      ? 'text-amber-400'
+                                      : 'text-blue-400'
+                                  } text-sm font-medium mr-2`}>Classroom:</span>
+                                <span className="text-base font-semibold text-white">{schedule.room}</span>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -732,7 +859,13 @@ const PresentationView: React.FC = () => {
                           </div>
                           <div className="w-full h-2 bg-gray-800/70 rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-emerald-500 rounded-full"
+                              className={`h-full ${
+                                schedule.mode === 'Mock'
+                                  ? 'bg-emerald-500'
+                                  : schedule.mode === 'Seminar'
+                                    ? 'bg-amber-500'
+                                    : 'bg-blue-500'
+                              } rounded-full`}
                               style={{ width: `${getClassProgress(schedule)}%` }}
                             />
                           </div>
