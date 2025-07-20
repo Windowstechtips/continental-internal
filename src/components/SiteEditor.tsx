@@ -464,9 +464,24 @@ const TeacherContentCard: React.FC<{
   const qualificationsList = React.useMemo(() => {
     if (!teacher.qualifications) return [];
     try {
+      // Handle array data type
       if (Array.isArray(teacher.qualifications)) {
         return teacher.qualifications;
       }
+      
+      // Handle PostgreSQL array format: {"qual1","qual2"}
+      if (typeof teacher.qualifications === 'string' && 
+          teacher.qualifications.startsWith('{') && 
+          teacher.qualifications.endsWith('}')) {
+        // Remove the braces and parse as CSV
+        const arrayContent = teacher.qualifications.substring(1, teacher.qualifications.length - 1);
+        return arrayContent
+          .split(',')
+          .map(q => q.replace(/^"|"$/g, '').trim())
+          .filter(Boolean);
+      }
+      
+      // Legacy format: "qual1","qual2"
       return teacher.qualifications
         .split('","')
         .map(q => q.replace(/^"|"$/g, '').trim())
@@ -556,9 +571,24 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
   const initialQualifications = React.useMemo(() => {
     if (!editingTeacher?.qualifications) return [];
     try {
+      // Handle array data type
       if (Array.isArray(editingTeacher.qualifications)) {
         return editingTeacher.qualifications;
       }
+      
+      // Handle PostgreSQL array format: {"qual1","qual2"}
+      if (typeof editingTeacher.qualifications === 'string' && 
+          editingTeacher.qualifications.startsWith('{') && 
+          editingTeacher.qualifications.endsWith('}')) {
+        // Remove the braces and parse as CSV
+        const arrayContent = editingTeacher.qualifications.substring(1, editingTeacher.qualifications.length - 1);
+        return arrayContent
+          .split(',')
+          .map(q => q.replace(/^"|"$/g, '').trim())
+          .filter(Boolean);
+      }
+      
+      // Legacy format: "qual1","qual2"
       return editingTeacher.qualifications
         .split('","')
         .map(q => q.replace(/^"|"$/g, '').trim())
@@ -582,6 +612,9 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
     
     // Get syllabus from comma-separated string (e.g., "Cambridge,Edexcel")
     const syllabus = editingTeacher?.syllabus || '';
+
+    console.log('Initializing form with teacher:', editingTeacher);
+    console.log('Initial picture_id:', editingTeacher?.picture_id);
 
     return {
       teacher_name: editingTeacher?.teacher_name || '',
@@ -607,31 +640,44 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
     setError(null);
 
     try {
-      // Format qualifications as required: "qual1","qual2"
+      console.log('Form data before processing:', formData);
+      console.log('Current qualifications:', qualifications);
+      console.log('Current picture_id:', formData.picture_id);
+      
+      // Format qualifications as a PostgreSQL array literal: {"qual1","qual2"}
       const formattedQualifications = qualifications.length > 0
-        ? qualifications
-            .map(q => `"${q.trim()}"`)
-            .join(',')
+        ? `{${qualifications.map(q => `"${q.trim()}"`).join(',')}}`
         : null;
+      
+      console.log('Formatted qualifications as array:', formattedQualifications);
 
       // Format grade and syllabus as comma-separated strings
       const grade = [
         formData.grade_9 ? '9' : '',
         formData.grade_10 ? '10' : '',
         formData.grade_as ? 'AS' : ''
-      ].filter(Boolean).join(',');
+      ].filter(Boolean).join(',') || null;
 
       const syllabus = [
         formData.curriculum_cambridge ? 'Cambridge' : '',
         formData.curriculum_edexcel ? 'Edexcel' : ''
-      ].filter(Boolean).join(',');
+      ].filter(Boolean).join(',') || null;
 
-      await onSave({
-        ...formData,
+      // Create a clean data object without the checkbox fields
+      const dataToSave = {
+        teacher_name: formData.teacher_name,
+        subject_name: formData.subject_name,
+        description: formData.description,
+        picture_id: formData.picture_id, // Make sure this is included
         qualifications: formattedQualifications,
         grade,
         syllabus
-      });
+      };
+      
+      console.log('Processed data to save:', dataToSave);
+      console.log('picture_id value being sent to onSave:', dataToSave.picture_id);
+      
+      await onSave(dataToSave);
       onClose();
     } catch (error) {
       console.error('Error saving teacher:', error);
@@ -650,8 +696,16 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
     }));
   };
 
-  const handleImageUploaded = (imageUrl: string) => {
-    setFormData(prev => ({ ...prev, picture_id: imageUrl }));
+  const handleImageUploaded = (imageUrl: string, publicId: string) => {
+    console.log('Image uploaded - URL:', imageUrl);
+    console.log('Image uploaded - Public ID:', publicId);
+    
+    // Make sure we're setting the correct field that matches the database column
+    setFormData(prev => {
+      const updated = { ...prev, picture_id: imageUrl };
+      console.log('Updated form data with picture_id:', updated);
+      return updated;
+    });
   };
 
   const handleAddQualification = () => {
@@ -965,6 +1019,13 @@ export default function SiteEditor() {
         .select('*');
       
       if (error) throw error;
+      
+      console.log('Teacher contents from database:', data);
+      if (data && data.length > 0) {
+        console.log('Sample teacher data structure:', data[0]);
+        console.log('Available fields:', Object.keys(data[0]));
+      }
+      
       setTeacherContents(data || []);
     } catch (error) {
       console.error('Error fetching teacher contents:', error);
@@ -1044,19 +1105,52 @@ export default function SiteEditor() {
 
   const handleSaveTeacherContent = async (data: Omit<Teacher, 'id'>) => {
     try {
+      console.log('Saving teacher data:', data);
+      console.log('picture_id being saved:', data.picture_id);
+      console.log('qualifications being saved:', data.qualifications);
+      
+      // Create a clean data object with only the fields that match the database schema
+      const cleanData = {
+        teacher_name: data.teacher_name,
+        subject_name: data.subject_name,
+        qualifications: data.qualifications, // This should now be in PostgreSQL array format
+        description: data.description,
+        picture_id: data.picture_id, // This is the correct column name
+        grade: data.grade || null,
+        syllabus: data.syllabus || null
+      };
+      
+      console.log('Clean data being sent to Supabase:', cleanData);
+      
       if (editingTeacherContent) {
-        const { error } = await supabase
+        console.log('Updating existing teacher with ID:', editingTeacherContent.id);
+        const { data: updatedData, error } = await supabase
           .from('teachers_content')
-          .update(data)
-          .eq('id', editingTeacherContent.id);
+          .update(cleanData)
+          .eq('id', editingTeacherContent.id)
+          .select();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase update error:', error);
+          console.error('Error details:', error);
+          throw error;
+        }
+        
+        console.log('Update successful, returned data:', updatedData);
       } else {
-        const { error } = await supabase
+        console.log('Creating new teacher');
+        const { data: insertedData, error } = await supabase
           .from('teachers_content')
-          .insert([data]);
+          .insert([cleanData])
+          .select();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase insert error:', error);
+          console.error('Error details:', error);
+          throw error;
+        }
+        
+        console.log('Insert successful, returned data:', insertedData);
       }
 
       fetchTeacherContents();
@@ -1064,6 +1158,7 @@ export default function SiteEditor() {
       setIsTeacherContentEditorOpen(false);
     } catch (error) {
       console.error('Error saving teacher content:', error);
+      alert('Failed to save teacher. Check console for details.');
     }
   };
 
@@ -1345,18 +1440,6 @@ export default function SiteEditor() {
             {/* Calendar Event list rendering is removed as per new_code */}
             
             {/* Calendar Event Editor Modal is removed as per new_code */}
-            
-            {/* Teacher Content Editor Modal is added as per new_code */}
-            {isTeacherContentEditorOpen && (
-              <TeacherContentEditor
-                onClose={() => {
-                  setIsTeacherContentEditorOpen(false);
-                  setEditingTeacherContent(undefined);
-                }}
-                editingTeacher={editingTeacherContent}
-                onSave={handleSaveTeacherContent}
-              />
-            )}
           </div>
         } />
         <Route
@@ -1405,17 +1488,6 @@ export default function SiteEditor() {
                     />
                   ))}
                 </div>
-              )}
-
-              {isTeacherContentEditorOpen && (
-                <TeacherContentEditor
-                  onClose={() => {
-                    setIsTeacherContentEditorOpen(false);
-                    setEditingTeacherContent(undefined);
-                  }}
-                  editingTeacher={editingTeacherContent}
-                  onSave={handleSaveTeacherContent}
-                />
               )}
             </div>
           }

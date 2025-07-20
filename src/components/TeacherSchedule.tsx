@@ -1302,6 +1302,20 @@ export default function TeacherSchedule() {
               
               {/* Modal Footer */}
               <div className="border-t border-gray-800 p-4 flex justify-end">
+                {canSchedule && (
+                  <button 
+                    onClick={(e) => {
+                      closeModal();
+                      if (selectedSchedule && selectedScheduleDay) {
+                        handleEditClick(e as React.MouseEvent<HTMLButtonElement>, selectedSchedule, selectedScheduleDay);
+                      }
+                    }}
+                    className="px-4 py-2 mr-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors flex items-center"
+                  >
+                    <PencilIcon className="h-4 w-4 mr-1" />
+                    Edit
+                  </button>
+                )}
                 <button 
                   onClick={closeModal}
                   className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
