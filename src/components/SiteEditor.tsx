@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { format } from 'date-fns';
@@ -569,11 +569,11 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
 }) => {
   // Initialize qualifications array from string or existing array
   const initialQualifications = React.useMemo(() => {
-    if (!editingTeacher?.qualifications) return [];
+    if (!editingTeacher?.qualifications) return []; // Return empty array if no qualifications
     try {
       // Handle array data type
       if (Array.isArray(editingTeacher.qualifications)) {
-        return editingTeacher.qualifications;
+        return editingTeacher.qualifications.length > 0 ? editingTeacher.qualifications : [];
       }
       
       // Handle PostgreSQL array format: {"qual1","qual2"}
@@ -582,20 +582,22 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
           editingTeacher.qualifications.endsWith('}')) {
         // Remove the braces and parse as CSV
         const arrayContent = editingTeacher.qualifications.substring(1, editingTeacher.qualifications.length - 1);
-        return arrayContent
+        const parsed = arrayContent
           .split(',')
           .map(q => q.replace(/^"|"$/g, '').trim())
           .filter(Boolean);
+        return parsed.length > 0 ? parsed : [];
       }
       
       // Legacy format: "qual1","qual2"
-      return editingTeacher.qualifications
+      const parsed = editingTeacher.qualifications
         .split('","')
         .map(q => q.replace(/^"|"$/g, '').trim())
         .filter(Boolean);
+      return parsed.length > 0 ? parsed : [];
     } catch (error) {
       console.error('Error parsing initial qualifications:', error);
-      return [];
+      return []; // Return empty array on error
     }
   }, [editingTeacher?.qualifications]);
 
@@ -644,10 +646,14 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
       console.log('Current qualifications:', qualifications);
       console.log('Current picture_id:', formData.picture_id);
       
+      // Ensure we have at least one qualification (database constraint)
+      const qualificationsToUse = qualifications.length > 0 
+        ? qualifications 
+        : ['Pending qualification details'];
+      
       // Format qualifications as a PostgreSQL array literal: {"qual1","qual2"}
-      const formattedQualifications = qualifications.length > 0
-        ? `{${qualifications.map(q => `"${q.trim()}"`).join(',')}}`
-        : null;
+      // Never allow null qualifications since the database has a NOT NULL constraint
+      const formattedQualifications = `{${qualificationsToUse.map(q => `"${q.trim()}"`).join(',')}}`;
       
       console.log('Formatted qualifications as array:', formattedQualifications);
 
@@ -868,50 +874,52 @@ const TeacherContentEditor = ({ onClose, editingTeacher, onSave }: {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2 text-gray-300">Qualifications</label>
-            {qualifications.length > 0 && (
-              <div className="mb-3 bg-gray-800/50 rounded-lg p-3">
-                <div className="text-xs text-gray-400 mb-2">Current qualifications:</div>
-                <div className="flex flex-wrap gap-2">
-                  {qualifications.map((qualification, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center gap-1 bg-gray-700/50 rounded-lg px-3 py-1.5 group"
-                    >
-                      <span className="text-gray-300 text-sm">{qualification}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveQualification(index)}
-                        className="text-gray-500 hover:text-red-400 transition-colors ml-2"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2">
+          {/* Qualifications */}
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-300">
+                Qualifications <span className="text-red-400">*</span>
+              </label>
+              <span className="text-xs text-gray-500">Required</span>
+            </div>
+            <div className="flex items-center mb-2">
               <input
                 type="text"
                 value={newQualification}
-                onChange={(e) => {
-                  setNewQualification(e.target.value);
-                  setError(null);
-                }}
+                onChange={(e) => setNewQualification(e.target.value)}
                 onKeyPress={handleKeyPress}
-                className="flex-1 px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 shadow-inner"
-                placeholder="Enter a qualification"
+                placeholder="Add a qualification and press Enter"
+                className="flex-grow px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-l-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               />
               <button
                 type="button"
                 onClick={handleAddQualification}
-                className="px-4 py-2 bg-blue-700 hover:bg-blue-600 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-70"
-                disabled={!newQualification.trim()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-r-lg transition-colors"
               >
                 Add
               </button>
+            </div>
+            {qualifications.length === 0 && (
+              <p className="text-amber-400 text-xs mb-2">
+                At least one qualification is required. A default will be added if left empty.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {qualifications.map((qualification, index) => (
+                <div
+                  key={index}
+                  className="flex items-center bg-gray-800/70 border border-gray-700/50 rounded-lg px-3 py-1.5"
+                >
+                  <span className="text-sm text-gray-300">{qualification}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveQualification(index)}
+                    className="ml-2 text-gray-400 hover:text-red-400"
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1113,7 +1121,7 @@ export default function SiteEditor() {
       const cleanData = {
         teacher_name: data.teacher_name,
         subject_name: data.subject_name,
-        qualifications: data.qualifications, // This should now be in PostgreSQL array format
+        qualifications: data.qualifications || '{}', // Ensure qualifications is never null
         description: data.description,
         picture_id: data.picture_id, // This is the correct column name
         grade: data.grade || null,

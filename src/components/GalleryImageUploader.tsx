@@ -4,6 +4,8 @@ import { supabase, ensureAuthenticated } from '../lib/supabaseClient';
 
 interface GalleryImageUploaderProps {
   onImageUploaded: (imageData: ImageMetadata) => void;
+  onMultipleImagesUploaded?: (imagesData: ImageMetadata[]) => void;
+  allowMultiple?: boolean;
 }
 
 // Define interface for image metadata
@@ -15,16 +17,22 @@ export interface ImageMetadata {
   upload_date: string;
 }
 
-export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUploaderProps) {
+export default function GalleryImageUploader({ 
+  onImageUploaded, 
+  onMultipleImagesUploaded, 
+  allowMultiple = false 
+}: GalleryImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tags, setTags] = useState<string>('');
   const [existingTags, setExistingTags] = useState<string[]>([]);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [uploadedImageData, setUploadedImageData] = useState<any>(null);
+  const [uploadedImagesData, setUploadedImagesData] = useState<any[]>([]);
   const [uploadComplete, setUploadComplete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagsInputRef = useRef<HTMLInputElement>(null);
@@ -84,55 +92,96 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     // Reset states
     setError(null);
     setUploadProgress(0);
     setUploadComplete(false);
-    setUploadedImageData(null);
+    setUploadedImagesData([]);
+    setPreviewUrls([]);
+    setCurrentFileIndex(0);
+    setTotalFiles(files.length);
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
-      setError('Please select a valid image file (JPEG, PNG, WEBP, or GIF)');
-      return;
+    // Create previews for all files
+    const previews: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!validTypes.includes(file.type)) {
+        setError(`File "${file.name}" is not a valid image file (JPEG, PNG, WEBP, or GIF)`);
+        continue;
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`File "${file.name}" exceeds the maximum size of 10MB`);
+        continue;
+      }
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        previews.push(reader.result as string);
+        if (previews.length === Math.min(files.length, 5)) { // Show max 5 previews
+          setPreviewUrls(previews);
+        }
+      };
+      reader.readAsDataURL(file);
     }
-
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('Image size should be less than 10MB');
-      return;
-    }
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result as string);
-    };
-    reader.readAsDataURL(file);
 
     // Start upload process
     setIsUploading(true);
-
-    // Create form data for upload
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', 'store_images');
-    formData.append('folder', 'galleryimages');
     
-    // Generate a unique public_id to avoid conflicts
-    const uniqueId = `gallery_${Date.now()}`;
-    formData.append('public_id', uniqueId);
-    
-    // Add tags if provided
-    const tagArray = tags.trim() ? tags.split(',').map(tag => tag.trim()) : [];
-    if (tagArray.length > 0) {
-      formData.append('tags', tagArray.join(','));
+    // Process files sequentially
+    const uploadedData = [];
+    for (let i = 0; i < files.length; i++) {
+      setCurrentFileIndex(i + 1);
+      try {
+        const result = await uploadSingleFile(files[i], i);
+        if (result) {
+          uploadedData.push(result);
+        }
+      } catch (error) {
+        console.error(`Error uploading file ${i + 1}:`, error);
+        setError(`Error uploading file ${i + 1}. Please try again.`);
+      }
     }
 
-    try {
+    // All uploads complete
+    setUploadedImagesData(uploadedData);
+    setUploadComplete(true);
+    setIsUploading(false);
+    
+    // Focus on the tags input to encourage adding tags
+    setTimeout(() => {
+      if (tagsInputRef.current) {
+        tagsInputRef.current.focus();
+      }
+    }, 100);
+  };
+
+  const uploadSingleFile = async (file: File, index: number): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      // Create form data for upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'store_images');
+      formData.append('folder', 'galleryimages');
+      
+      // Generate a unique public_id to avoid conflicts
+      const uniqueId = `gallery_${Date.now()}_${index}`;
+      formData.append('public_id', uniqueId);
+      
+      // Add tags if provided
+      const tagArray = tags.trim() ? tags.split(',').map(tag => tag.trim()) : [];
+      if (tagArray.length > 0) {
+        formData.append('tags', tagArray.join(','));
+      }
+
       // Use XMLHttpRequest to track upload progress
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`);
@@ -149,20 +198,9 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
       xhr.onload = async () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           const cloudinaryResponse = JSON.parse(xhr.responseText);
-          
-          // Store the uploaded image data and wait for user confirmation
-          setUploadedImageData(cloudinaryResponse);
-          setUploadComplete(true);
-          
-          // Focus on the tags input to encourage adding tags
-          setTimeout(() => {
-            if (tagsInputRef.current) {
-              tagsInputRef.current.focus();
-            }
-          }, 100);
-          
+          resolve(cloudinaryResponse);
         } else {
-          let errorMsg = 'Upload failed. Please try again.';
+          let errorMsg = `Upload of file ${index + 1} failed. Please try again.`;
           try {
             const response = JSON.parse(xhr.responseText);
             errorMsg = response.error?.message || errorMsg;
@@ -170,25 +208,19 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
             // If we can't parse the response, use the default error message
           }
           console.error('Upload failed:', xhr.responseText);
-          setError(`Cloudinary error: ${errorMsg}`);
-          setIsUploading(false);
+          reject(new Error(errorMsg));
         }
       };
       
       // Handle network errors
       xhr.onerror = () => {
         console.error('Network error during upload');
-        setError('Network error. Please check your internet connection and try again.');
-        setIsUploading(false);
+        reject(new Error('Network error. Please check your internet connection and try again.'));
       };
       
       // Send the request
       xhr.send(formData);
-    } catch (err) {
-      console.error('Error during upload:', err);
-      setError('An unexpected error occurred. Please try again.');
-      setIsUploading(false);
-    }
+    });
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -210,11 +242,11 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
   };
 
   const handleCancelUpload = () => {
-    setPreviewUrl(null);
+    setPreviewUrls([]);
     setError(null);
     setTags('');
     setUploadComplete(false);
-    setUploadedImageData(null);
+    setUploadedImagesData([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -251,7 +283,7 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
   };
 
   const handleCompleteUpload = async () => {
-    if (!uploadedImageData) return;
+    if (uploadedImagesData.length === 0) return;
     
     setIsUploading(true);
     
@@ -264,30 +296,36 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
         ? tags.split(',').map(tag => tag.trim()).filter(tag => tag) 
         : [];
       
-      const { data, error } = await supabase
-        .from('gallery_images')
-        .insert([{
-          image_url: uploadedImageData.secure_url,
-          public_id: uploadedImageData.public_id,
-          tags: tagArray,
-          upload_date: new Date().toISOString()
-        }])
-        .select()
-        .single();
+      // Process each uploaded image
+      const savedImages: ImageMetadata[] = [];
       
-      if (error) {
-        console.error('Error saving to Supabase:', error);
-        setError(`Database error: ${error.message}`);
-        setIsUploading(false);
-        return;
+      for (const imageData of uploadedImagesData) {
+        const { data, error } = await supabase
+          .from('gallery_images')
+          .insert([{
+            image_url: imageData.secure_url,
+            public_id: imageData.public_id,
+            tags: tagArray,
+            upload_date: new Date().toISOString()
+          }])
+          .select()
+          .single();
+        
+        if (error) {
+          console.error('Error saving to Supabase:', error);
+          setError(`Database error: ${error.message}`);
+          continue;
+        }
+        
+        savedImages.push(data);
       }
       
       // Reset the form
-      setPreviewUrl(null);
+      setPreviewUrls([]);
       setUploadProgress(0);
       setTags('');
       setUploadComplete(false);
-      setUploadedImageData(null);
+      setUploadedImagesData([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -296,17 +334,22 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
       fetchExistingTags();
       
       // Notify parent component
-      onImageUploaded(data);
+      if (savedImages.length === 1) {
+        onImageUploaded(savedImages[0]);
+      } else if (savedImages.length > 1 && onMultipleImagesUploaded) {
+        onMultipleImagesUploaded(savedImages);
+      }
       
     } catch (err) {
       console.error('Error saving to Supabase:', err);
       setError('Failed to save image metadata to database.');
+    } finally {
       setIsUploading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-center w-full">
         <label
           htmlFor="gallery-image-upload"
@@ -322,17 +365,28 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          {previewUrl ? (
-            <div className="relative w-full h-full">
-              <img
-                src={previewUrl}
-                alt="Preview"
-                className="w-full h-full object-contain p-2"
-              />
+          {previewUrls.length > 0 ? (
+            <div className="relative w-full h-full p-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto">
+                {previewUrls.map((url, index) => (
+                  <div key={index} className="relative aspect-square overflow-hidden rounded-md">
+                    <img
+                      src={url}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {index === 0 && previewUrls.length > 5 && (
+                      <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                        <span className="text-white text-lg font-bold">+{previewUrls.length - 5} more</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
               {!isUploading && !uploadComplete && (
                 <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-50 transition-opacity flex items-center justify-center">
                   <span className="text-white opacity-0 hover:opacity-100">
-                    Click to change image
+                    Click to change images
                   </span>
                 </div>
               )}
@@ -364,7 +418,8 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
               <p className="mb-2 text-sm text-gray-400">
                 <span className="font-semibold">Click to upload</span> or drag and drop
               </p>
-              <p className="text-xs text-gray-400">PNG, JPG, WEBP or GIF (max 10MB)</p>
+              <p className="text-xs text-gray-400">PNG, JPG, WEBP or GIF (max 10MB{allowMultiple ? ' each' : ''})</p>
+              {allowMultiple && <p className="text-xs text-blue-400 mt-1">You can select multiple files</p>}
             </div>
           )}
           <input
@@ -372,6 +427,7 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple={allowMultiple}
             className="hidden"
             onChange={handleFileChange}
             disabled={isUploading || uploadComplete}
@@ -418,7 +474,7 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
         
         <p className="text-xs text-gray-400">
           {uploadComplete 
-            ? "Add or edit tags before saving your image" 
+            ? "Add or edit tags before saving your images" 
             : "Add tags to help organize your images (optional)"}
         </p>
       </div>
@@ -432,7 +488,9 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
             ></div>
           </div>
           <p className="text-sm text-gray-400 text-center">
-            Uploading to Cloudinary... {uploadProgress}%
+            {allowMultiple 
+              ? `Uploading file ${currentFileIndex} of ${totalFiles}... ${uploadProgress}%` 
+              : `Uploading to Cloudinary... ${uploadProgress}%`}
           </p>
         </div>
       )}
@@ -450,7 +508,7 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
       )}
 
       {uploadComplete && (
-        <div className="flex justify-end space-x-3">
+        <div className="flex justify-end space-x-3 mt-6">
           <button
             type="button"
             onClick={handleCancelUpload}
@@ -463,13 +521,13 @@ export default function GalleryImageUploader({ onImageUploaded }: GalleryImageUp
             onClick={handleCompleteUpload}
             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
           >
-            Save Image
+            Save {uploadedImagesData.length > 1 ? `${uploadedImagesData.length} Images` : 'Image'}
           </button>
         </div>
       )}
 
-      {previewUrl && !isUploading && !uploadComplete && (
-        <div className="flex justify-end">
+      {previewUrls.length > 0 && !isUploading && !uploadComplete && (
+        <div className="flex justify-end mt-4">
           <button
             type="button"
             onClick={handleCancelUpload}

@@ -226,17 +226,26 @@ const PresentationView: React.FC = () => {
         if (schedulesError) throw schedulesError;
         
         // Filter schedules based on repeats and date
-        const today = format(currentTime, 'M/d');
+        const today = new Date();
+        const todayFormatted = format(today, 'M/d'); // Format today's date as M/d
+        
         const filteredData = schedulesData?.filter(schedule => {
+          // If repeats is true, always show the class on its scheduled day
+          if (schedule.repeats) {
+            return true;
+          }
+          
+          // If repeats is false, only show if today's date matches the date_tag exactly
+          if (schedule.date_tag) {
+            return schedule.date_tag === todayFormatted;
+          }
+          
+          // Fallback to the old logic for backward compatibility
           const hasRepeatTag = schedule.description?.includes('REPEAT');
           const hasDateTag = schedule.description?.match(/DATE:([0-9/]+)/);
           
-          // Show if:
-          // 1. Has REPEAT tag (show always for matching day), or
-          // 2. Has DATE tag matching today's date, or
-          // 3. Has no special tags
           return hasRepeatTag || 
-            (hasDateTag ? hasDateTag[1] === today : true);
+            (hasDateTag ? hasDateTag[1] === todayFormatted : true);
         });
         
         // Get currently active classes
@@ -404,7 +413,7 @@ const PresentationView: React.FC = () => {
       >
         {/* Status indicator and time in a single row */}
         <div className="flex justify-between items-center mb-1">
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             {isCanceledToday ? (
               <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium bg-red-900/30 text-red-400 border border-red-500/30`}>
                 Canceled
@@ -428,6 +437,19 @@ const PresentationView: React.FC = () => {
                 {schedule.mode}
               </span>
             )}
+            {/* Show repeats indicator */}
+            <span className={`px-1.5 py-0.5 rounded-md ${isCompact ? 'text-xs' : 'text-sm'} font-medium ${
+              schedule.repeats 
+                ? 'bg-purple-500/20 text-purple-100 border-purple-500/30' 
+                : 'bg-gray-700/30 text-gray-300 border-gray-600/30'
+            } border`}>
+              {schedule.repeats 
+                ? 'Weekly' 
+                : schedule.date_tag 
+                  ? `One-time (${schedule.date_tag})` 
+                  : 'One-time'
+              }
+            </span>
           </div>
           <div className="text-right font-medium text-base">
             <span className={`bg-gradient-to-r ${colors.textGradient} bg-clip-text text-transparent`}>
@@ -712,7 +734,7 @@ const PresentationView: React.FC = () => {
                       >
                         {/* Status indicator and time */}
                         <div className="flex justify-between items-center mb-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             {/* Show mode label */}
                             {schedule.mode && (
                               <span className={`px-3 py-1.5 rounded-md text-base font-bold ${
@@ -725,6 +747,19 @@ const PresentationView: React.FC = () => {
                                 {schedule.mode}
                               </span>
                             )}
+                            {/* Show repeats status */}
+                            <span className={`px-3 py-1.5 rounded-md text-base font-bold ${
+                              schedule.repeats 
+                                ? 'bg-purple-500/20 text-purple-100 border-purple-500/30' 
+                                : 'bg-gray-700/30 text-gray-300 border-gray-600/30'
+                              } border`}>
+                              {schedule.repeats 
+                                ? 'Weekly' 
+                                : schedule.date_tag 
+                                  ? `One-time (${schedule.date_tag})` 
+                                  : 'One-time'
+                              }
+                            </span>
                           </div>
                           <div className="text-right font-medium">
                             <span className={`text-xl bg-gradient-to-r ${

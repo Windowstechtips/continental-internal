@@ -504,27 +504,23 @@ export default function TeacherSchedule() {
   
   // Handle teacher change in form
   const handleFormTeacherChange = (teacherId: number) => {
-    // Get the teacher
-    const teacher = teachers.find(t => t.id === teacherId);
-    if (!teacher) {
-      // If no teacher selected, reset subject
-      setSchedulingFormData({
-        ...schedulingFormData,
-        teacher_id: 0,
-        subject: ''
-      });
-      return;
-    }
-    
-    // Get all subjects for this teacher
+    // Get the teacher's subjects
     const subjects = getTeacherSubjects(teacherId);
     
-    // Update the form data with new teacher_id and first available subject
-    setSchedulingFormData({
-      ...schedulingFormData,
-      teacher_id: teacherId,
-      subject: subjects.length > 0 ? subjects[0] : ''
-    });
+    // In edit mode, try to keep the current subject if the teacher offers it
+    if (isEditMode && subjects.includes(schedulingFormData.subject)) {
+      setSchedulingFormData({
+        ...schedulingFormData,
+        teacher_id: teacherId
+      });
+    } else {
+      // Otherwise, select the first subject
+      setSchedulingFormData({
+        ...schedulingFormData,
+        teacher_id: teacherId,
+        subject: subjects.length > 0 ? subjects[0] : ''
+      });
+    }
   };
 
   // Handle edit button click
@@ -744,7 +740,7 @@ export default function TeacherSchedule() {
                       : 'bg-gradient-to-br from-blue-600 to-indigo-500 hover:from-blue-700 hover:to-indigo-600 border-blue-400'
               } border rounded-md p-2 text-xs ${
                 isFinished ? 'text-gray-400' : 'text-gray-200'
-              } shadow-md transition-all duration-200 cursor-pointer transform hover:scale-[1.02] hover:z-20 group overflow-hidden`}
+              } shadow-md transition-all duration-200 cursor-pointer transform hover:scale-[1.02] hover:z-20 group group/schedule overflow-hidden`}
               style={{
                 height: calculateScheduleHeight(schedule.start_time, schedule.end_time),
                 top: calculateScheduleTop(schedule.start_time),
@@ -764,7 +760,7 @@ export default function TeacherSchedule() {
               {/* Edit button - only shown on hover and when user has scheduling rights */}
               {canSchedule && !isSmallCard && (
                 <div 
-                  className="absolute top-1 right-1 p-1 rounded-full bg-gray-900/70 opacity-0 group-hover:opacity-100 cursor-pointer transition-all duration-200 hover:bg-blue-600/70 z-10"
+                  className="absolute top-1 right-1 p-1 rounded-full bg-gray-900/70 opacity-0 group-hover/schedule:opacity-100 cursor-pointer transition-all duration-200 hover:bg-blue-600/70 z-10"
                   onClick={(e) => handleEditClick(e, schedule, day)}
                   title="Edit schedule"
                 >
@@ -860,10 +856,12 @@ export default function TeacherSchedule() {
         {/* Add scheduling option for empty cells if user has scheduling rights */}
         {canSchedule && schedules.length === 0 && (
           <div 
-            onClick={() => handleScheduleClick(day, hour)}
-            className="absolute inset-0 flex items-center justify-center cursor-pointer"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
           >
-            <div className="w-8 h-8 rounded-full bg-gray-800/80 border border-gray-700/50 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity duration-200 hover:bg-gray-700/80">
+            <div 
+              onClick={() => handleScheduleClick(day, hour)}
+              className="w-8 h-8 rounded-full bg-gray-800/80 border border-gray-700/50 flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-opacity duration-200 hover:bg-gray-700/80 cursor-pointer pointer-events-auto"
+            >
               <PlusIcon className="h-5 w-5 text-blue-400" />
             </div>
           </div>
@@ -1207,9 +1205,9 @@ export default function TeacherSchedule() {
 
         {/* Schedule Detail Modal */}
         {isModalOpen && selectedSchedule && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeModal}>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={closeModal}>
             <div 
-              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl overflow-hidden"
+              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl my-8 overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header with Accent Gradient */}
@@ -1329,9 +1327,9 @@ export default function TeacherSchedule() {
 
         {/* Confirmation Modal for Deletion/Cancellation */}
         {isConfirmDeleteOpen && selectedSchedule && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeConfirmDelete}>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={closeConfirmDelete}>
             <div 
-              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-md overflow-hidden"
+              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-md my-8 overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header */}
@@ -1391,9 +1389,9 @@ export default function TeacherSchedule() {
         
         {/* Class Scheduling Modal */}
         {isSchedulingModalOpen && selectedScheduleDay && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={closeSchedulingModal}>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={closeSchedulingModal}>
             <div 
-              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl overflow-hidden"
+              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl my-8 overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header with Accent Gradient */}
