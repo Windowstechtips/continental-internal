@@ -227,7 +227,7 @@ const PresentationView: React.FC = () => {
         
         // Filter schedules based on repeats and date
         const today = new Date();
-        const todayFormatted = format(today, 'M/d'); // Format today's date as M/d
+        const todayFormatted = format(today, 'yyyy-MM-dd'); // Format today's date as yyyy-MM-dd to match date_tag format
         
         const filteredData = schedulesData?.filter(schedule => {
           // If repeats is true, always show the class on its scheduled day
@@ -243,9 +243,10 @@ const PresentationView: React.FC = () => {
           // Fallback to the old logic for backward compatibility
           const hasRepeatTag = schedule.description?.includes('REPEAT');
           const hasDateTag = schedule.description?.match(/DATE:([0-9/]+)/);
+          const todayMD = format(today, 'M/d'); // Format as M/d for legacy date tag comparison
           
           return hasRepeatTag || 
-            (hasDateTag ? hasDateTag[1] === todayFormatted : true);
+            (hasDateTag ? hasDateTag[1] === todayMD : true);
         });
         
         // Get currently active classes
@@ -622,6 +623,24 @@ const PresentationView: React.FC = () => {
   
   return (
     <div className="fixed inset-0 bg-black flex flex-col">
+      {/* Enhanced background decorative elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Primary gradient mesh - larger, more diffused gradients */}
+        <div className="absolute -top-[10%] right-[5%] w-[80vw] h-[70vh] bg-gradient-to-bl from-blue-600/8 via-blue-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
+        <div className="absolute -bottom-[10%] left-[5%] w-[80vw] h-[70vh] bg-gradient-to-tr from-blue-500/8 via-sky-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
+        
+        {/* Secondary gradient accents - smaller, more vibrant */}
+        <div className="absolute top-[25%] left-[15%] w-[40vw] h-[40vh] bg-gradient-to-r from-cyan-500/5 to-blue-400/5 rounded-full filter blur-[60px] animate-pulse-slow"></div>
+        <div className="absolute bottom-[25%] right-[15%] w-[40vw] h-[40vh] bg-gradient-to-r from-blue-500/5 to-sky-400/5 rounded-full filter blur-[60px] animate-pulse-slow" style={{ animationDelay: '2s' }}></div>
+        
+        {/* Tertiary accent points - small, subtle light sources */}
+        <div className="absolute top-[40%] right-[30%] w-[15vw] h-[15vh] bg-blue-400/3 rounded-full filter blur-[40px] animate-float" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-[40%] left-[30%] w-[15vw] h-[15vh] bg-sky-400/3 rounded-full filter blur-[40px] animate-float" style={{ animationDelay: '3s' }}></div>
+        
+        {/* Grain overlay for texture */}
+        <div className="absolute inset-0 opacity-[0.15] mix-blend-overlay bg-noise"></div>
+      </div>
+
       {/* Header with date and time */}
       <header className="bg-black/80 backdrop-blur-sm border-b border-gray-800 px-8 py-4 flex justify-between items-center">
         <div>

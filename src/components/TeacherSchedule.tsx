@@ -938,9 +938,9 @@ export default function TeacherSchedule() {
   };
 
   return (
-    <div className="min-h-screen w-full">
-      {/* Simplified background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
+    <div className="h-screen w-full bg-[#0a0a0a] flex flex-col overflow-hidden">
+      {/* Enhanced background decorative elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {/* Primary gradient mesh - larger, more diffused gradients */}
         <div className="absolute -top-[10%] right-[5%] w-[80vw] h-[70vh] bg-gradient-to-bl from-blue-600/8 via-blue-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
         <div className="absolute -bottom-[10%] left-[5%] w-[80vw] h-[70vh] bg-gradient-to-tr from-blue-500/8 via-sky-400/5 to-transparent rounded-[100%] filter blur-[80px]"></div>
@@ -968,8 +968,8 @@ export default function TeacherSchedule() {
         </div>
       )}
 
-      <div className="relative z-10 p-4 md:p-6 flex flex-col h-[calc(100vh-2rem)]">
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+      <div className="relative z-10 flex flex-col h-full p-4 md:p-6">
+        <div className="flex-none mb-6 flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex flex-col md:flex-row md:items-center md:space-x-6 space-y-4 md:space-y-0">
             <div className="flex items-center">
               <button
@@ -1029,9 +1029,9 @@ export default function TeacherSchedule() {
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden rounded-xl border border-gray-700/50 bg-gray-800/40 backdrop-blur-md shadow-2xl flex flex-col">
+        <div className="flex-1 rounded-xl border border-gray-700/50 bg-gray-800/40 backdrop-blur-md shadow-2xl flex flex-col overflow-hidden">
           {/* Date Navigation Bar */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50 bg-gray-800/60">
+          <div className="flex-none flex items-center justify-between px-4 py-3 border-b border-gray-700/50 bg-gray-800/60">
             <button
               onClick={isMobileView ? goToPreviousDay : goToPreviousWeek}
               className="p-1.5 hover:bg-gray-700/50 rounded-full text-gray-300 hover:text-white transition-colors"
@@ -1056,7 +1056,7 @@ export default function TeacherSchedule() {
             </button>
           </div>
           
-          <div ref={tableRef} className="overflow-y-auto overflow-x-auto h-full custom-scrollbar">
+          <div ref={tableRef} className="flex-1 overflow-auto custom-scrollbar">
             <table className="w-full border-collapse">
               <thead className="sticky top-0 z-20">
                 <tr>
@@ -1389,42 +1389,42 @@ export default function TeacherSchedule() {
         
         {/* Class Scheduling Modal */}
         {isSchedulingModalOpen && selectedScheduleDay && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto" onClick={closeSchedulingModal}>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-2 sm:p-4 overflow-y-auto" onClick={closeSchedulingModal}>
             <div 
-              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl my-8 overflow-hidden"
+              className="bg-gray-900 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-3xl my-4 sm:my-8 overflow-hidden"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header with Accent Gradient */}
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-sky-400 opacity-90"></div>
-                <div className="relative p-5 flex justify-between items-center">
-                  <h3 className="text-xl font-bold text-white">
+                <div className="relative p-3 sm:p-5 flex justify-between items-center">
+                  <h3 className="text-lg sm:text-xl font-bold text-white">
                     {isEditMode ? 'Edit Class' : 'Schedule New Class'}
                   </h3>
                   <button 
                     onClick={closeSchedulingModal}
                     className="text-white hover:bg-white/20 rounded-full p-1 transition-colors"
                   >
-                    <XMarkIcon className="h-6 w-6" />
+                    <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
                   </button>
                 </div>
               </div>
               
               {/* Modal Content */}
-              <div className="p-5 space-y-4">
-                <div className="text-gray-300 mb-2 text-sm">
+              <div className="p-3 sm:p-8 space-y-6 max-h-[calc(100vh-8rem)] overflow-y-auto">
+                <div className="text-gray-300 mb-4 text-xs sm:text-sm">
                   Scheduling for: <span className="text-blue-400 font-medium">{format(selectedScheduleDay, 'EEEE, MMMM d')}</span> at <span className="text-blue-400 font-medium">{selectedScheduleHour && format(new Date().setHours(selectedScheduleHour, 0), 'h:mm a')}</span>
                 </div>
                 
                 {/* Scheduling Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
                   {/* Teacher */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Teacher</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Teacher</label>
                     <select
                       value={schedulingFormData.teacher_id}
                       onChange={e => handleFormTeacherChange(parseInt(e.target.value))}
-                      className={`w-full px-3 py-2 bg-gray-800/80 border rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
+                      className={`w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
                         !isEditMode && schedulingFormData.teacher_id === 0 ? 'border-amber-500' : 'border-gray-700'
                       }`}
                       required
@@ -1443,11 +1443,11 @@ export default function TeacherSchedule() {
                   
                   {/* Subject */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Subject</label>
                     <select
                       value={schedulingFormData.subject}
                       onChange={e => setSchedulingFormData({...schedulingFormData, subject: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
                       disabled={schedulingFormData.teacher_id === 0}
                     >
@@ -1465,11 +1465,11 @@ export default function TeacherSchedule() {
                   
                   {/* Grade */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Grade</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Grade</label>
                     <select
                       value={schedulingFormData.grade}
                       onChange={e => setSchedulingFormData({...schedulingFormData, grade: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
                     >
                       <option value="Grade 9">Grade 9</option>
@@ -1480,11 +1480,11 @@ export default function TeacherSchedule() {
                   
                   {/* Curriculum */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Curriculum</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Curriculum</label>
                     <select
                       value={schedulingFormData.curriculum}
                       onChange={e => setSchedulingFormData({...schedulingFormData, curriculum: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
                     >
                       <option value="Edexcel">Edexcel</option>
@@ -1494,23 +1494,23 @@ export default function TeacherSchedule() {
                   
                   {/* Room */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Room</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Room</label>
                     <input
                       type="text"
                       value={schedulingFormData.room}
                       onChange={e => setSchedulingFormData({...schedulingFormData, room: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       placeholder="Enter room number/name"
                     />
                   </div>
 
                   {/* Mode */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Mode</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Mode</label>
                     <select
                       value={schedulingFormData.mode}
                       onChange={e => setSchedulingFormData({...schedulingFormData, mode: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
                     >
                       <option value="Mock">Mock</option>
@@ -1521,29 +1521,29 @@ export default function TeacherSchedule() {
                   
                   {/* Start & End Time */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Start Time</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Start Time</label>
                     <input
                       type="time"
                       value={schedulingFormData.start_time}
                       onChange={e => setSchedulingFormData({...schedulingFormData, start_time: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">End Time</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">End Time</label>
                     <input
                       type="time"
                       value={schedulingFormData.end_time}
                       onChange={e => setSchedulingFormData({...schedulingFormData, end_time: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       required
                     />
                   </div>
                   
                   {/* Repeat Option */}
-                  <div className="col-span-2">
+                  <div>
                     <div className="flex items-center space-x-3">
                       <input
                         type="checkbox"
@@ -1552,7 +1552,7 @@ export default function TeacherSchedule() {
                         onChange={e => setSchedulingFormData({...schedulingFormData, repeats: e.target.checked})}
                         className="h-4 w-4 rounded border-gray-700 bg-gray-800 text-blue-500 focus:ring-blue-600"
                       />
-                      <label htmlFor="repeats" className="text-sm font-medium text-gray-300">
+                      <label htmlFor="repeats" className="text-xs sm:text-sm font-medium text-gray-300">
                         Repeats Weekly
                       </label>
                     </div>
@@ -1560,11 +1560,11 @@ export default function TeacherSchedule() {
                   
                   {/* Description */}
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Description (Optional)</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1">Description (Optional)</label>
                     <textarea
                       value={schedulingFormData.description}
                       onChange={e => setSchedulingFormData({...schedulingFormData, description: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-800/80 border border-gray-700 rounded-lg text-sm sm:text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                       placeholder="Additional details about the class"
                       rows={3}
                     ></textarea>
@@ -1572,21 +1572,21 @@ export default function TeacherSchedule() {
                 </div>
               </div>
               
-              {/* Modal Footer */}
-              <div className="border-t border-gray-800 p-4 flex justify-between items-center">
+              {/* Modal Footer - Stacked layout on mobile */}
+              <div className="border-t border-gray-800 p-3 sm:p-4 flex flex-col-reverse sm:flex-row sm:justify-between items-stretch sm:items-center gap-3">
                 {/* Delete options - only shown in edit mode */}
                 {isEditMode && (
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button 
                       onClick={() => handleDeleteClick('cancel')}
-                      className="px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg transition-colors flex items-center space-x-1"
+                      className="px-3 sm:px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg transition-colors flex items-center justify-center sm:justify-start space-x-1 text-sm"
                     >
                       <XMarkIcon className="h-4 w-4" />
                       <span>Cancel This Occurrence</span>
                     </button>
                     <button 
                       onClick={() => handleDeleteClick('delete')}
-                      className="px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors flex items-center space-x-1"
+                      className="px-3 sm:px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors flex items-center justify-center sm:justify-start space-x-1 text-sm"
                     >
                       <XMarkIcon className="h-4 w-4" />
                       <span>Delete All Occurrences</span>
@@ -1595,16 +1595,16 @@ export default function TeacherSchedule() {
                 )}
                 
                 {/* Save/Cancel buttons */}
-                <div className="flex space-x-3">
+                <div className="flex-grow flex sm:flex-grow-0 gap-2 sm:gap-3 justify-end">
                   <button 
                     onClick={closeSchedulingModal}
-                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors"
+                    className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-lg transition-colors text-sm"
                   >
                     Cancel
                   </button>
                   <button 
                     onClick={handleScheduleSubmit}
-                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300"
+                    className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-300 text-sm"
                   >
                     {isEditMode ? 'Update Class' : 'Schedule Class'}
                   </button>
@@ -1641,4 +1641,4 @@ export default function TeacherSchedule() {
       `}</style>
     </div>
   );
-} 
+}
